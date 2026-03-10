@@ -6,6 +6,7 @@ pub mod driver;
 pub mod ingress;
 pub mod interpolation;
 pub mod persistence;
+pub mod serial_runtime;
 
 pub const MAGIC: u16 = 0x5743;
 pub const VERSION: u8 = 1;
