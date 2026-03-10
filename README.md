@@ -16,6 +16,20 @@ Conceptually, the system operates as:
 
 The current Block 1 architecture has three major parts.
 
+```text
+ iPhone App
+     │
+     │ BLE packets
+     ▼
+ Arduino Device
+ ┌───────────────────────┐
+ │ Packet Parser (Rust)  │
+ │ Interpolation Engine  │
+ │ Device State          │
+ │ Display Driver        │
+ └───────────────────────┘
+```
+
 The iPhone companion application is responsible for:
 
 - obtaining GPS position
