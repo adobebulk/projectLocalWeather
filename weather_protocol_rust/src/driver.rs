@@ -29,11 +29,6 @@ pub trait TextDisplay {
     fn render(&mut self, lines: &DisplayLines) -> Result<(), DisplayError>;
 }
 
-/// Displays that expose logged entries for runtime inspection.
-pub trait LoggableDisplay {
-    fn drain_logs(&mut self) -> Vec<String>;
-}
-
 /// Dummy display implementation used by unit tests and future integration.
 #[derive(Debug, Default)]
 pub struct MockDisplay {

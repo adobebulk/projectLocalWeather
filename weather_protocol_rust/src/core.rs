@@ -1,6 +1,6 @@
 use crate::assembler::{AssemblerError, AssemblerResult, PacketAssembler};
 use crate::display::{format_display, DisplayLines};
-use crate::driver::{DisplayError, LoggableDisplay, TextDisplay};
+use crate::driver::{DisplayError, TextDisplay};
 use crate::ingress::{IngressResult, PacketIngress};
 use crate::persistence::{PersistenceBackend, PersistenceError, StatePersistence};
 use crate::{PACKET_TYPE_POSITION_UPDATE_V1, PACKET_TYPE_REGIONAL_SNAPSHOT_V1};
@@ -150,16 +150,6 @@ where
             self.latest_display_lines = Some(lines);
         }
         Ok(())
-    }
-}
-
-impl<B, D> FirmwareCore<B, D>
-where
-    B: PersistenceBackend,
-    D: TextDisplay + LoggableDisplay,
-{
-    pub fn take_display_logs(&mut self) -> Vec<String> {
-        self.display.drain_logs()
     }
 }
 

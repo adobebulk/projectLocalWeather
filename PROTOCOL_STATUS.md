@@ -143,6 +143,29 @@ Capabilities:
 
 ---
 
+## BLE Adapter Boundary
+
+Status: COMPLETE
+
+Location:
+weather_protocol_rust/src/ble_adapter.rs
+
+Capabilities:
+
+- receives BLE-style byte fragments from a board-facing boundary
+- forwards fragments into FirmwareCore transport ingestion
+- exposes pending AckV1 bytes for transmit on accepted and rejected packets
+- exposes current display lines from FirmwareCore
+- supports boot restore through FirmwareCore
+
+Implementation note:
+
+- this is a thin boundary adapter only
+- board-specific BLE callback wiring is still future work
+- legacy `serial_runtime` harness module has been removed
+
+---
+
 ## Packet Assembler
 
 Status: COMPLETE
@@ -165,8 +188,8 @@ Status: NOT IMPLEMENTED
 Future responsibilities:
 
 - receive BLE fragments from the iPhone
-- feed fragments into the packet assembler
-- send AckV1 responses
+- route callbacks through the `ble_adapter` boundary
+- transmit pending AckV1 responses from the adapter
 - integrate board-specific flash persistence backend
 
 ---
