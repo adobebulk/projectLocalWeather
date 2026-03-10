@@ -37,10 +37,16 @@ void print_display_if_available() {
     BridgeDisplayLinesC lines{};
     BridgeResultCode rc = bridge_get_display_lines(g_bridge, &lines);
     if (rc != BRIDGE_OK) {
+        if (rc == BRIDGE_NO_DATA) {
+            Serial.println("DISPLAY none");
+        } else {
+            Serial.print("DISPLAY error rc=");
+            Serial.println((int)rc);
+        }
         return;
     }
 
-    Serial.println("LCD:");
+    Serial.println("DISPLAY lines");
     serial_print_line(lines.line1, lines.line1_len);
     serial_print_line(lines.line2, lines.line2_len);
 }
@@ -59,6 +65,7 @@ void send_ack_if_available() {
         &ack_len);
 
     if (rc == BRIDGE_NO_DATA) {
+        Serial.println("ACK none");
         return;
     }
 
@@ -75,7 +82,7 @@ void send_ack_if_available() {
 
     // BLE TX hook for next step:
     // ble_notify_ack(ack_buf, ack_len);
-    Serial.print("SEND ACK bytes=");
+    Serial.print("ACK bytes=");
     Serial.println((unsigned long)ack_len);
 }
 
@@ -98,13 +105,17 @@ void on_ble_fragment_received(const uint8_t* fragment, size_t len) {
         now_unix(),
         &ingest_state);
 
+    Serial.print("RX len=");
+    Serial.print((unsigned long)len);
+    Serial.print(" rc=");
+    Serial.print((int)rc);
+    Serial.print(" state=");
+    Serial.println((int)ingest_state);
+
     if (rc != BRIDGE_OK) {
         Serial.println("bridge_push_ble_fragment error");
         return;
     }
-
-    Serial.print("Ingest state=");
-    Serial.println((int)ingest_state);
 
     send_ack_if_available();
     print_display_if_available();
@@ -114,15 +125,18 @@ void setup() {
     Serial.begin(115200);
     while (!Serial) {
     }
-    Serial.println("Block1 Nano Attempt Boot");
+    Serial.println("BOOT start");
 
     g_bridge = bridge_new_in_memory();
     if (g_bridge == nullptr) {
         Serial.println("bridge_new_in_memory failed");
         return;
     }
+    Serial.println("BOOT bridge_new_in_memory ok");
 
     BridgeResultCode rc = bridge_restore_on_boot(g_bridge, now_unix());
+    Serial.print("BOOT restore rc=");
+    Serial.println((int)rc);
     if (rc != BRIDGE_OK) {
         Serial.println("restore_on_boot error");
     }
@@ -135,5 +149,5 @@ void setup() {
 
 void loop() {
     // Event-driven RX is expected; keep loop thin.
-    delay(100);
+    delay(250);
 }

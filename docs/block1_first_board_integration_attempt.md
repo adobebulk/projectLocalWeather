@@ -38,6 +38,13 @@ ABI header:
 
 - `weather_protocol_rust/include/weather_bridge_ffi.h`
 
+Symbol visibility check:
+
+```bash
+cd weather_protocol_rust
+nm -g target/release/libweather_protocol_rust.a | rg "bridge_(new_in_memory|restore_on_boot|push_ble_fragment|take_pending_ack|get_display_lines|free)"
+```
+
 ## 3. Arduino/Nano Shell Mapping
 
 The shell uses these ABI functions:
@@ -94,14 +101,40 @@ weather_protocol_rust/
 - pending ACK byte length when available
 - display lines when weather + position data exist
 
-## 6. Pass Criteria for This Attempt
+## 6. Expected Serial Output
+
+Successful boot-only expectation:
+
+```text
+BOOT start
+BOOT bridge_new_in_memory ok
+BOOT restore rc=0
+DISPLAY none
+```
+
+First fragment-ingest expectation (shape):
+
+```text
+RX len=<N> rc=0 state=<0|1|2>
+ACK <none|bytes=...>
+DISPLAY <none|lines>
+```
+
+State mapping:
+
+- `state=0`: assembler needs more bytes
+- `state=1`: one packet completed
+- `state=2`: malformed/reset path
+
+## 7. Pass Criteria for This Attempt
 
 - Rust static library links into board shell build.
 - ABI calls execute from board shell without crash.
 - serial shows ACK and display data paths through Rust core.
 
-## 7. Assumptions
+## 8. Assumptions
 
 - first pass uses in-memory bridge constructor (`bridge_new_in_memory`)
 - timestamp source is temporary placeholder
 - BLE TX and RX callbacks are integrated incrementally with current serial-first validation strategy
+- board toolchain can link a Rust-produced static library for the target architecture
