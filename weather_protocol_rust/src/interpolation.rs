@@ -7,6 +7,11 @@ use crate::{
 const METERS_PER_DEGREE_LATITUDE: f64 = 111_320.0;
 const METERS_PER_MILE: f64 = 1_609.344;
 
+/// Estimated local conditions in protocol-native units.
+///
+/// The confidence score is computed locally on the device. It is a tunable
+/// Block 1 heuristic, not a physical truth model and not part of the wire
+/// format.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EstimatedLocalConditions {
     pub air_temp_c_tenths: i16,
@@ -58,6 +63,19 @@ struct NumericSample {
     visibility_m: f64,
 }
 
+/// Block 1 interpolation over a decoded weather field and position.
+///
+/// This module intentionally uses a crude planar approximation for the
+/// 240-mile field. The goal for Block 1 is clear, stable, and testable
+/// behavior rather than sophisticated geodesic math.
+///
+/// Spatial and temporal queries are clamped outside the field and forecast
+/// bounds. Returned weather values come from the nearest valid edge of the
+/// stored field, while the confidence score carries the degradation.
+///
+/// Hazard flags are combined conservatively. If any contributing anchor or
+/// time slot with non-zero interpolation weight sets a hazard bit, the result
+/// keeps that bit set.
 pub fn estimate_local_conditions(
     weather: &RegionalSnapshotV1,
     position: &PositionUpdateV1,
@@ -145,6 +163,11 @@ pub fn estimate_local_conditions(
     })
 }
 
+/// Returns only the local confidence score for a weather field and position.
+///
+/// This 0-100 score is intentionally simple and tunable. It is for local
+/// device behavior in Block 1 and should not be treated as a physical truth
+/// model.
 pub fn calculate_confidence_score(
     weather: &RegionalSnapshotV1,
     position: &PositionUpdateV1,
@@ -277,9 +300,9 @@ fn build_spatial_context(
     metadata: &RegionalSnapshotMetadataV1,
     position: &PositionUpdateV1,
 ) -> SpatialContext {
-    // Block 1 uses a simple equirectangular approximation. This is intentional:
-    // the field is small enough that stability and readability matter more here
-    // than geodesic precision.
+    // Block 1 intentionally uses a simple planar approximation. The field is
+    // small enough that stable, explicit behavior matters more than geodesic
+    // precision here.
     let center_latitude_degrees = f64::from(metadata.field_center_lat_e5) / 100_000.0;
     let latitude_delta_degrees =
         (f64::from(position.lat_e5) - f64::from(metadata.field_center_lat_e5)) / 100_000.0;
@@ -311,6 +334,7 @@ fn build_temporal_context(field_timestamp_unix: u32, current_unix_timestamp: u32
     let weather_age_minutes = clamped_age_seconds / 60;
 
     if clamped_age_seconds <= 0 {
+        // Before slot 0, clamp to the first forecast slot.
         return TemporalContext {
             lower_slot_index: 0,
             upper_slot_index: 0,
@@ -321,6 +345,8 @@ fn build_temporal_context(field_timestamp_unix: u32, current_unix_timestamp: u32
     }
 
     if clamped_age_seconds >= 7_200 {
+        // Beyond the 120-minute horizon, clamp values to the last slot and let
+        // the local confidence score carry the degradation.
         return TemporalContext {
             lower_slot_index: 2,
             upper_slot_index: 2,
@@ -645,6 +671,25 @@ mod tests {
     }
 
     #[test]
+    fn center_position_exact_slot_sixty() {
+        let weather = build_weather();
+        let position = build_position(3_405_223, -11_824_368, 1_700_003_600, 8);
+
+        let result =
+            estimate_local_conditions(&weather, &position, 1_700_003_600).expect("interpolation should succeed");
+
+        assert_eq!(result.air_temp_c_tenths, 600);
+        assert_eq!(result.wind_speed_mps_tenths, 70);
+        assert_eq!(result.wind_gust_mps_tenths, 80);
+        assert_eq!(result.precip_prob_pct, 38);
+        assert_eq!(result.precip_kind, 1);
+        assert_eq!(result.precip_intensity, 2);
+        assert_eq!(result.visibility_m, 9_900);
+        assert_eq!(result.hazard_flags, 1_536);
+        assert_eq!(result.confidence_score, 90);
+    }
+
+    #[test]
     fn position_near_edge_of_field_uses_spatial_blend() {
         let weather = build_weather();
         let lon_offset = miles_to_lon_e5(110.0, weather.metadata.field_center_lat_e5);
@@ -688,6 +733,28 @@ mod tests {
     }
 
     #[test]
+    fn far_outside_field_bounds_drives_confidence_very_low() {
+        let weather = build_weather();
+        let lon_offset = miles_to_lon_e5(400.0, weather.metadata.field_center_lat_e5);
+        let lat_offset = miles_to_lat_e5(400.0);
+        let position = build_position(
+            weather.metadata.field_center_lat_e5 + lat_offset,
+            weather.metadata.field_center_lon_e5 + lon_offset,
+            1_700_000_000,
+            2_500,
+        );
+
+        let result =
+            estimate_local_conditions(&weather, &position, 1_700_009_000).expect("interpolation should succeed");
+
+        assert_eq!(result.air_temp_c_tenths, 320);
+        assert_eq!(result.wind_speed_mps_tenths, 50);
+        assert_eq!(result.precip_prob_pct, 40);
+        assert_eq!(result.precip_kind, 2);
+        assert!(result.confidence_score <= 20);
+    }
+
+    #[test]
     fn beyond_horizon_clamps_weather_and_degrades_confidence() {
         let weather = build_weather();
         let position = build_position(3_405_223, -11_824_368, 1_700_009_000, 8);
@@ -727,6 +794,32 @@ mod tests {
 
         assert_eq!(result.hazard_flags & 256, 256);
         assert_eq!(result.hazard_flags & 512, 512);
+    }
+
+    #[test]
+    fn strongest_weighted_precip_source_wins_kind_selection() {
+        let mut weather = build_weather();
+        weather.anchor_slots[4][0].precip_prob_pct = 40;
+        weather.anchor_slots[4][0].precip_kind = 1;
+        weather.anchor_slots[4][0].precip_intensity = 1;
+        weather.anchor_slots[5][0].precip_prob_pct = 80;
+        weather.anchor_slots[5][0].precip_kind = 2;
+        weather.anchor_slots[5][0].precip_intensity = 3;
+
+        let lon_offset = miles_to_lon_e5(90.0, weather.metadata.field_center_lat_e5);
+        let position = build_position(
+            weather.metadata.field_center_lat_e5,
+            weather.metadata.field_center_lon_e5 + lon_offset,
+            1_700_000_000,
+            8,
+        );
+
+        let result =
+            estimate_local_conditions(&weather, &position, 1_700_000_000).expect("interpolation should succeed");
+
+        assert_eq!(result.precip_kind, 2);
+        assert_eq!(result.precip_intensity, 3);
+        assert!(result.precip_prob_pct > 40);
     }
 
     #[test]
