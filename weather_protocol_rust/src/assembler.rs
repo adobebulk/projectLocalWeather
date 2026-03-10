@@ -110,9 +110,9 @@ impl PacketAssembler {
             let total_length = u16::from_le_bytes([self.buffer[4], self.buffer[5]]);
             if usize::from(total_length) < HEADER_SIZE {
                 self.reset();
-                return Err(AssemblerResult::Malformed(AssemblerError::WrongTotalLength(
-                    total_length,
-                )));
+                return Err(AssemblerResult::Malformed(
+                    AssemblerError::WrongTotalLength(total_length),
+                ));
             }
             if usize::from(total_length) > MAX_PACKET_SIZE {
                 self.reset();
@@ -249,7 +249,10 @@ mod tests {
 
         let second_result = assembler.push_bytes(&second_packet[10..]);
 
-        assert_eq!(second_result, AssemblerResult::PacketComplete(second_packet));
+        assert_eq!(
+            second_result,
+            AssemblerResult::PacketComplete(second_packet)
+        );
     }
 
     #[test]
@@ -268,7 +271,10 @@ mod tests {
 
         let second_result = assembler.push_bytes(&second_packet[2..]);
 
-        assert_eq!(second_result, AssemblerResult::PacketComplete(second_packet));
+        assert_eq!(
+            second_result,
+            AssemblerResult::PacketComplete(second_packet)
+        );
     }
 
     #[test]
@@ -281,7 +287,10 @@ mod tests {
         let second_result = assembler.push_bytes(&second_packet);
 
         assert_eq!(first_result, AssemblerResult::PacketComplete(first_packet));
-        assert_eq!(second_result, AssemblerResult::PacketComplete(second_packet));
+        assert_eq!(
+            second_result,
+            AssemblerResult::PacketComplete(second_packet)
+        );
     }
 
     #[test]
@@ -289,7 +298,12 @@ mod tests {
         let packet = load_fixture("valid_weather.bin");
         let mut assembler = PacketAssembler::new();
 
-        let fragments = [&packet[..20], &packet[20..180], &packet[180..320], &packet[320..]];
+        let fragments = [
+            &packet[..20],
+            &packet[20..180],
+            &packet[180..320],
+            &packet[320..],
+        ];
         let mut last_result = AssemblerResult::NeedMore {
             bytes_collected: 0,
             expected_total_length: None,

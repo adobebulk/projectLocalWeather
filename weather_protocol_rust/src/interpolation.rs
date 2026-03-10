@@ -1,7 +1,6 @@
 use crate::{
-    PositionUpdateV1, RegionalSnapshotMetadataV1, RegionalSnapshotV1, WeatherSlot,
-    ANCHOR_COUNT, FIELD_HEIGHT_MI, FIELD_WIDTH_MI, FORECAST_HORIZON_MIN, GRID_COLS, GRID_ROWS,
-    SLOT_COUNT,
+    PositionUpdateV1, RegionalSnapshotMetadataV1, RegionalSnapshotV1, WeatherSlot, ANCHOR_COUNT,
+    FIELD_HEIGHT_MI, FIELD_WIDTH_MI, FORECAST_HORIZON_MIN, GRID_COLS, GRID_ROWS, SLOT_COUNT,
 };
 
 const METERS_PER_DEGREE_LATITUDE: f64 = 111_320.0;
@@ -203,7 +202,9 @@ fn calculate_confidence(
 ) -> u8 {
     let mut score = 100i64;
 
-    let effective_weather_age_minutes = temporal.weather_age_minutes.max(i64::from(source_age_minutes));
+    let effective_weather_age_minutes = temporal
+        .weather_age_minutes
+        .max(i64::from(source_age_minutes));
     score -= effective_weather_age_minutes.min(120) / 6;
     score -= temporal.minutes_beyond_horizon.min(120) / 3;
 
@@ -216,9 +217,8 @@ fn calculate_confidence(
         score -= 20;
     }
 
-    let position_age_minutes = (i64::from(current_unix_timestamp) - i64::from(position_timestamp_unix))
-        .max(0)
-        / 60;
+    let position_age_minutes =
+        (i64::from(current_unix_timestamp) - i64::from(position_timestamp_unix)).max(0) / 60;
     score -= position_age_minutes.min(30);
     score -= i64::from((position_accuracy_m / 100).min(20));
 
@@ -328,7 +328,10 @@ fn build_spatial_context(
     }
 }
 
-fn build_temporal_context(field_timestamp_unix: u32, current_unix_timestamp: u32) -> TemporalContext {
+fn build_temporal_context(
+    field_timestamp_unix: u32,
+    current_unix_timestamp: u32,
+) -> TemporalContext {
     let weather_age_seconds = i64::from(current_unix_timestamp) - i64::from(field_timestamp_unix);
     let clamped_age_seconds = weather_age_seconds.max(0);
     let weather_age_minutes = clamped_age_seconds / 60;
@@ -493,9 +496,10 @@ fn clamp_i16(value: f64) -> i16 {
 mod tests {
     use super::{estimate_local_conditions, InterpolationError};
     use crate::{
-        PacketHeader, PositionUpdateV1, RegionalSnapshotMetadataV1, RegionalSnapshotV1, WeatherSlot,
-        FIELD_HEIGHT_MI, FIELD_WIDTH_MI, FORECAST_HORIZON_MIN, GRID_COLS, GRID_ROWS, MAGIC,
-        PACKET_TYPE_POSITION_UPDATE_V1, PACKET_TYPE_REGIONAL_SNAPSHOT_V1, SLOT_COUNT, VERSION,
+        PacketHeader, PositionUpdateV1, RegionalSnapshotMetadataV1, RegionalSnapshotV1,
+        WeatherSlot, FIELD_HEIGHT_MI, FIELD_WIDTH_MI, FORECAST_HORIZON_MIN, GRID_COLS, GRID_ROWS,
+        MAGIC, PACKET_TYPE_POSITION_UPDATE_V1, PACKET_TYPE_REGIONAL_SNAPSHOT_V1, SLOT_COUNT,
+        VERSION,
     };
 
     fn sample_weather_slot(
@@ -602,7 +606,12 @@ mod tests {
         }
     }
 
-    fn build_position(lat_e5: i32, lon_e5: i32, timestamp_unix: u32, accuracy_m: u16) -> PositionUpdateV1 {
+    fn build_position(
+        lat_e5: i32,
+        lon_e5: i32,
+        timestamp_unix: u32,
+        accuracy_m: u16,
+    ) -> PositionUpdateV1 {
         PositionUpdateV1 {
             header: PacketHeader {
                 magic: MAGIC,
@@ -637,8 +646,8 @@ mod tests {
         let weather = build_weather();
         let position = build_position(3_405_223, -11_824_368, 1_700_000_000, 8);
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_000_000).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_000_000)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.air_temp_c_tenths, 500);
         assert_eq!(result.wind_speed_mps_tenths, 50);
@@ -656,8 +665,8 @@ mod tests {
         let weather = build_weather();
         let position = build_position(3_405_223, -11_824_368, 1_700_001_800, 8);
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_001_800).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_001_800)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.air_temp_c_tenths, 550);
         assert_eq!(result.wind_speed_mps_tenths, 60);
@@ -675,8 +684,8 @@ mod tests {
         let weather = build_weather();
         let position = build_position(3_405_223, -11_824_368, 1_700_003_600, 8);
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_003_600).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_003_600)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.air_temp_c_tenths, 600);
         assert_eq!(result.wind_speed_mps_tenths, 70);
@@ -701,8 +710,8 @@ mod tests {
             8,
         );
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_000_000).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_000_000)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.air_temp_c_tenths, 317);
         assert_eq!(result.wind_speed_mps_tenths, 32);
@@ -723,8 +732,8 @@ mod tests {
             8,
         );
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_000_000).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_000_000)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.air_temp_c_tenths, 600);
         assert_eq!(result.wind_speed_mps_tenths, 60);
@@ -744,8 +753,8 @@ mod tests {
             2_500,
         );
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_009_000).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_009_000)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.air_temp_c_tenths, 320);
         assert_eq!(result.wind_speed_mps_tenths, 50);
@@ -759,8 +768,8 @@ mod tests {
         let weather = build_weather();
         let position = build_position(3_405_223, -11_824_368, 1_700_009_000, 8);
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_009_000).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_009_000)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.air_temp_c_tenths, 700);
         assert_eq!(result.wind_speed_mps_tenths, 90);
@@ -777,8 +786,8 @@ mod tests {
         let weather = build_weather();
         let position = build_position(3_405_223, -11_824_368, 1_699_998_200, 8);
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_000_000).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_000_000)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.air_temp_c_tenths, 500);
         assert_eq!(result.confidence_score, 70);
@@ -789,8 +798,8 @@ mod tests {
         let weather = build_weather();
         let position = build_position(3_405_223, -11_824_368, 1_700_000_000, 8);
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_001_800).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_001_800)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.hazard_flags & 256, 256);
         assert_eq!(result.hazard_flags & 512, 512);
@@ -814,8 +823,8 @@ mod tests {
             8,
         );
 
-        let result =
-            estimate_local_conditions(&weather, &position, 1_700_000_000).expect("interpolation should succeed");
+        let result = estimate_local_conditions(&weather, &position, 1_700_000_000)
+            .expect("interpolation should succeed");
 
         assert_eq!(result.precip_kind, 2);
         assert_eq!(result.precip_intensity, 3);

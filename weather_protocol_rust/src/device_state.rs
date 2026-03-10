@@ -112,9 +112,10 @@ impl DeviceState {
 mod tests {
     use super::DeviceState;
     use crate::{
-        PacketHeader, PositionUpdateV1, RegionalSnapshotMetadataV1, RegionalSnapshotV1, WeatherSlot,
-        FIELD_HEIGHT_MI, FIELD_WIDTH_MI, FORECAST_HORIZON_MIN, GRID_COLS, GRID_ROWS, MAGIC,
-        PACKET_TYPE_POSITION_UPDATE_V1, PACKET_TYPE_REGIONAL_SNAPSHOT_V1, SLOT_COUNT, VERSION,
+        PacketHeader, PositionUpdateV1, RegionalSnapshotMetadataV1, RegionalSnapshotV1,
+        WeatherSlot, FIELD_HEIGHT_MI, FIELD_WIDTH_MI, FORECAST_HORIZON_MIN, GRID_COLS, GRID_ROWS,
+        MAGIC, PACKET_TYPE_POSITION_UPDATE_V1, PACKET_TYPE_REGIONAL_SNAPSHOT_V1, SLOT_COUNT,
+        VERSION,
     };
 
     fn sample_weather_slot(
@@ -284,7 +285,9 @@ mod tests {
             .apply_position_update(build_position(1_700_000_600, 20_000))
             .expect("second position should apply");
 
-        let second_estimate = state.current_estimate().expect("second estimate should exist");
+        let second_estimate = state
+            .current_estimate()
+            .expect("second estimate should exist");
         assert_ne!(second_estimate.air_temp_c_tenths, first_temp);
         assert_eq!(state.last_position_update_timestamp(), Some(1_700_000_600));
         assert_eq!(state.last_recompute_timestamp(), Some(1_700_000_600));

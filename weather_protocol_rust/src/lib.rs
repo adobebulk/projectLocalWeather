@@ -1,9 +1,11 @@
-pub mod device_state;
 pub mod assembler;
+pub mod core;
+pub mod device_state;
+pub mod display;
+pub mod driver;
 pub mod ingress;
 pub mod interpolation;
 pub mod persistence;
-pub mod display;
 
 pub const MAGIC: u16 = 0x5743;
 pub const VERSION: u8 = 1;
@@ -115,19 +117,43 @@ pub enum Packet {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseError {
-    PacketTooShort { expected_at_least: usize, actual: usize },
-    BadMagic { expected: u16, actual: u16 },
-    UnsupportedVersion { expected: u8, actual: u8 },
+    PacketTooShort {
+        expected_at_least: usize,
+        actual: usize,
+    },
+    BadMagic {
+        expected: u16,
+        actual: u16,
+    },
+    UnsupportedVersion {
+        expected: u8,
+        actual: u8,
+    },
     UnsupportedPacketType(u8),
-    WrongPacketLengthInHeader { expected: usize, actual: usize },
-    WrongPacketByteLength { expected: usize, actual: usize },
-    BadChecksum { expected: u32, actual: u32 },
-    PacketTypeMismatch { expected: u8, actual: u8 },
+    WrongPacketLengthInHeader {
+        expected: usize,
+        actual: usize,
+    },
+    WrongPacketByteLength {
+        expected: usize,
+        actual: usize,
+    },
+    BadChecksum {
+        expected: u32,
+        actual: u32,
+    },
+    PacketTypeMismatch {
+        expected: u8,
+        actual: u8,
+    },
     LatitudeOutOfRange(i32),
     LongitudeOutOfRange(i32),
     AccuracyMustBeGreaterThanZero,
     UnsupportedStatusCode(u8),
-    ReservedNotZero { field_name: &'static str, value: u8 },
+    ReservedNotZero {
+        field_name: &'static str,
+        value: u8,
+    },
     FieldWidthMustBe240(u16),
     FieldHeightMustBe240(u16),
     GridRowsMustBe3(u8),
@@ -149,9 +175,9 @@ pub fn parse_packet(packet: &[u8]) -> Result<Packet, ParseError> {
     validate_header_fields(header)?;
 
     match header.packet_type {
-        PACKET_TYPE_REGIONAL_SNAPSHOT_V1 => {
-            Ok(Packet::RegionalSnapshotV1(parse_regional_snapshot_v1(packet)?))
-        }
+        PACKET_TYPE_REGIONAL_SNAPSHOT_V1 => Ok(Packet::RegionalSnapshotV1(
+            parse_regional_snapshot_v1(packet)?,
+        )),
         PACKET_TYPE_POSITION_UPDATE_V1 => {
             Ok(Packet::PositionUpdateV1(parse_position_update_v1(packet)?))
         }
@@ -367,9 +393,7 @@ fn validate_header_fields(header: PacketHeader) -> Result<(), ParseError> {
     }
     if !matches!(
         header.packet_type,
-        PACKET_TYPE_REGIONAL_SNAPSHOT_V1
-            | PACKET_TYPE_POSITION_UPDATE_V1
-            | PACKET_TYPE_ACK_V1
+        PACKET_TYPE_REGIONAL_SNAPSHOT_V1 | PACKET_TYPE_POSITION_UPDATE_V1 | PACKET_TYPE_ACK_V1
     ) {
         return Err(ParseError::UnsupportedPacketType(header.packet_type));
     }
@@ -502,10 +526,13 @@ fn validate_regional_metadata(metadata: &RegionalSnapshotMetadataV1) -> Result<(
 }
 
 fn read_u8(packet: &[u8], offset: usize) -> Result<u8, ParseError> {
-    packet.get(offset).copied().ok_or(ParseError::PacketTooShort {
-        expected_at_least: offset + 1,
-        actual: packet.len(),
-    })
+    packet
+        .get(offset)
+        .copied()
+        .ok_or(ParseError::PacketTooShort {
+            expected_at_least: offset + 1,
+            actual: packet.len(),
+        })
 }
 
 fn read_u16_le(packet: &[u8], offset: usize) -> Result<u16, ParseError> {

@@ -1,5 +1,6 @@
 use crate::interpolation::EstimatedLocalConditions;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DisplayLines {
     pub line1: String,
     pub line2: String,
@@ -244,7 +245,7 @@ mod tests {
     }
 
     #[test]
-        fn severe_thunderstorm_case() {
+    fn severe_thunderstorm_case() {
         let mut conditions = base_conditions();
         conditions.precip_kind = 9;
         conditions.precip_intensity = 4;

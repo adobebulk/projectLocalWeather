@@ -79,18 +79,14 @@ impl<B: PersistenceBackend> StatePersistence<B> {
         self.save_record(PersistedRecordKind::PositionUpdate, &packet_bytes)
     }
 
-    pub fn restore_weather_snapshot(
-        &self,
-    ) -> Result<Option<RegionalSnapshotV1>, PersistenceError> {
+    pub fn restore_weather_snapshot(&self) -> Result<Option<RegionalSnapshotV1>, PersistenceError> {
         let Some(record) = self.restore_record(PersistedRecordKind::WeatherSnapshot)? else {
             return Ok(None);
         };
         Ok(Some(parse_regional_snapshot_v1(&record.payload_bytes)?))
     }
 
-    pub fn restore_position_update(
-        &self,
-    ) -> Result<Option<PositionUpdateV1>, PersistenceError> {
+    pub fn restore_position_update(&self) -> Result<Option<PositionUpdateV1>, PersistenceError> {
         let Some(record) = self.restore_record(PersistedRecordKind::PositionUpdate)? else {
             return Ok(None);
         };
@@ -357,9 +353,7 @@ impl PersistenceBackend for InMemoryPersistenceBackend {
     ) -> Result<(), PersistenceError> {
         match kind {
             PersistedRecordKind::WeatherSnapshot => self.weather_slots[slot_index] = data.to_vec(),
-            PersistedRecordKind::PositionUpdate => {
-                self.position_slots[slot_index] = data.to_vec()
-            }
+            PersistedRecordKind::PositionUpdate => self.position_slots[slot_index] = data.to_vec(),
         }
         Ok(())
     }
@@ -371,10 +365,10 @@ mod tests {
         InMemoryPersistenceBackend, PersistedRecordKind, PersistenceBackend, StatePersistence,
     };
     use crate::{
-        PacketHeader, PositionUpdateV1, RegionalSnapshotMetadataV1, RegionalSnapshotV1, WeatherSlot,
-        FIELD_HEIGHT_MI, FIELD_WIDTH_MI, FORECAST_HORIZON_MIN, GRID_COLS, GRID_ROWS, MAGIC,
-        PACKET_TYPE_POSITION_UPDATE_V1, PACKET_TYPE_REGIONAL_SNAPSHOT_V1, POSITION_PACKET_SIZE,
-        REGIONAL_PACKET_SIZE, SLOT_COUNT, VERSION,
+        PacketHeader, PositionUpdateV1, RegionalSnapshotMetadataV1, RegionalSnapshotV1,
+        WeatherSlot, FIELD_HEIGHT_MI, FIELD_WIDTH_MI, FORECAST_HORIZON_MIN, GRID_COLS, GRID_ROWS,
+        MAGIC, PACKET_TYPE_POSITION_UPDATE_V1, PACKET_TYPE_REGIONAL_SNAPSHOT_V1,
+        POSITION_PACKET_SIZE, REGIONAL_PACKET_SIZE, SLOT_COUNT, VERSION,
     };
 
     fn sample_weather_slot(
@@ -501,8 +495,14 @@ mod tests {
         persistence.save_weather_snapshot(&weather).unwrap();
         let restored = persistence.restore_weather_snapshot().unwrap().unwrap();
 
-        assert_eq!(restored.header.timestamp_unix, weather.header.timestamp_unix);
-        assert_eq!(restored.metadata.field_center_lat_e5, weather.metadata.field_center_lat_e5);
+        assert_eq!(
+            restored.header.timestamp_unix,
+            weather.header.timestamp_unix
+        );
+        assert_eq!(
+            restored.metadata.field_center_lat_e5,
+            weather.metadata.field_center_lat_e5
+        );
     }
 
     #[test]
@@ -513,15 +513,22 @@ mod tests {
         persistence.save_position_update(&position).unwrap();
         let restored = persistence.restore_position_update().unwrap().unwrap();
 
-        assert_eq!(restored.header.timestamp_unix, position.header.timestamp_unix);
+        assert_eq!(
+            restored.header.timestamp_unix,
+            position.header.timestamp_unix
+        );
         assert_eq!(restored.lon_e5, position.lon_e5);
     }
 
     #[test]
     fn boot_restore_path() {
         let mut persistence = StatePersistence::new(InMemoryPersistenceBackend::default());
-        persistence.save_weather_snapshot(&build_weather(1_700_000_000)).unwrap();
-        persistence.save_position_update(&build_position(1_700_000_000)).unwrap();
+        persistence
+            .save_weather_snapshot(&build_weather(1_700_000_000))
+            .unwrap();
+        persistence
+            .save_position_update(&build_position(1_700_000_000))
+            .unwrap();
 
         let state = persistence.restore_device_state(1_700_000_000).unwrap();
 
@@ -533,7 +540,9 @@ mod tests {
     #[test]
     fn corrupted_stored_record_rejection() {
         let mut persistence = StatePersistence::new(InMemoryPersistenceBackend::default());
-        persistence.save_weather_snapshot(&build_weather(1_700_000_000)).unwrap();
+        persistence
+            .save_weather_snapshot(&build_weather(1_700_000_000))
+            .unwrap();
 
         let mut corrupt = persistence
             .backend()
@@ -550,8 +559,12 @@ mod tests {
     #[test]
     fn interrupted_invalid_record_fallback_behavior() {
         let mut persistence = StatePersistence::new(InMemoryPersistenceBackend::default());
-        persistence.save_position_update(&build_position(1_700_000_000)).unwrap();
-        persistence.save_position_update(&build_position(1_700_000_600)).unwrap();
+        persistence
+            .save_position_update(&build_position(1_700_000_000))
+            .unwrap();
+        persistence
+            .save_position_update(&build_position(1_700_000_600))
+            .unwrap();
 
         let mut bad_slot = persistence
             .backend()

@@ -1,7 +1,7 @@
 use crate::device_state::{DeviceState, DeviceStateError};
 use crate::{
-    crc32_with_zeroed_checksum, parse_header, parse_packet, AckV1, Packet, PacketHeader, ParseError,
-    ACK_PACKET_SIZE, CHECKSUM_OFFSET, HEADER_SIZE, MAGIC, PACKET_TYPE_ACK_V1,
+    crc32_with_zeroed_checksum, parse_header, parse_packet, AckV1, Packet, PacketHeader,
+    ParseError, ACK_PACKET_SIZE, CHECKSUM_OFFSET, HEADER_SIZE, MAGIC, PACKET_TYPE_ACK_V1,
     PACKET_TYPE_POSITION_UPDATE_V1, PACKET_TYPE_REGIONAL_SNAPSHOT_V1, STATUS_ACCEPTED,
     STATUS_BAD_CHECKSUM, STATUS_BAD_MAGIC, STATUS_INTERNAL_BUSY, STATUS_SEMANTIC_VALIDATION_FAILED,
     STATUS_UNSUPPORTED_PACKET_TYPE, STATUS_UNSUPPORTED_VERSION, STATUS_WRONG_LENGTH, VERSION,
@@ -118,17 +118,17 @@ impl PacketIngress {
         }
     }
 
+    pub fn replace_device_state(&mut self, state: DeviceState) {
+        self.device_state = state;
+    }
+
     fn accept_result(
         &mut self,
         echoed_sequence: u32,
         ack_timestamp_unix: u32,
         accepted_packet_type: u8,
     ) -> IngressResult {
-        let ack = self.build_ack(
-            echoed_sequence,
-            STATUS_ACCEPTED,
-            ack_timestamp_unix,
-        );
+        let ack = self.build_ack(echoed_sequence, STATUS_ACCEPTED, ack_timestamp_unix);
         let ack_bytes = encode_ack_packet(&ack);
 
         IngressResult::Accepted(IngressSuccess {
