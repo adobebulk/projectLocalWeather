@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use weather_protocol_rust::device_state::DeviceState;
 use weather_protocol_rust::{
     crc32_with_zeroed_checksum, parse_ack_v1, parse_packet, parse_position_update_v1,
     parse_regional_snapshot_v1, ParseError, Packet, CHECKSUM_OFFSET, REGIONAL_PACKET_SIZE,
@@ -169,4 +170,33 @@ fn rejects_invalid_slot_offsets() {
             actual: [30, 60, 120]
         }
     ));
+}
+
+#[test]
+fn end_to_end_fixture_bytes_to_device_state_estimate() {
+    let weather_packet = load_fixture("valid_weather.bin");
+    let position_packet = load_fixture("valid_position.bin");
+
+    let weather = parse_regional_snapshot_v1(&weather_packet)
+        .expect("valid weather fixture should parse");
+    let position = parse_position_update_v1(&position_packet)
+        .expect("valid position fixture should parse");
+
+    let mut device_state = DeviceState::new();
+    device_state
+        .apply_weather_snapshot(weather)
+        .expect("weather snapshot should apply");
+    device_state
+        .apply_position_update(position)
+        .expect("position update should apply");
+
+    let estimate = device_state
+        .current_estimate()
+        .expect("device state should contain an estimate");
+
+    assert!(estimate.air_temp_c_tenths != 0);
+    assert!(estimate.wind_speed_mps_tenths != 0);
+    assert!(estimate.visibility_m != 0);
+    assert!(estimate.precip_prob_pct <= 100);
+    assert!(estimate.confidence_score > 0);
 }
