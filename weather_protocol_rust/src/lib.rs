@@ -5,6 +5,7 @@ pub mod core;
 pub mod device_state;
 pub mod display;
 pub mod driver;
+pub mod ffi;
 pub mod ingress;
 pub mod interpolation;
 pub mod persistence;
