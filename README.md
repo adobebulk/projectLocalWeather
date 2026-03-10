@@ -12,6 +12,20 @@ Conceptually, the system operates as:
 
 `regional_weather_field + current_position + current_time -> estimated_local_conditions`
 
+```text
+iPhone App
+    |
+    | BLE packets
+    v
+Arduino Device
+|- PacketAssembler
+|- PacketIngress
+|- Protocol Parser
+|- DeviceState
+|- Interpolation Engine
+'- Display Driver (future)
+```
+
 ## 2. System Architecture
 
 The current Block 1 architecture has three major parts.
