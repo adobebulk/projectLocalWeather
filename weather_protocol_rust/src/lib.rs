@@ -3,6 +3,7 @@ pub mod assembler;
 pub mod ingress;
 pub mod interpolation;
 pub mod persistence;
+pub mod display;
 
 pub const MAGIC: u16 = 0x5743;
 pub const VERSION: u8 = 1;
