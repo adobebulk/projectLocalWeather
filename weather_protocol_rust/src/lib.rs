@@ -1,4 +1,5 @@
 pub mod device_state;
+pub mod assembler;
 pub mod ingress;
 pub mod interpolation;
 
