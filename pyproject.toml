@@ -1,0 +1,6 @@
+
+[project]
+name = "weather_protocol"
+version = "0.1.0"
+description = "Reference implementation for the Weather Computer Block 1 protocol"
+requires-python = ">=3.9"
