@@ -28,6 +28,13 @@ Board integration seam:
   - I2C LCD output boundary
   - timestamp source boundary
 
+Current hardware hookup status:
+
+- serial logger: real ESP hook in `src/main.rs` (`ets_printf`) under ESP target cfg
+- timestamp source: real ESP hook in `src/main.rs` (`esp_timer_get_time`) under ESP target cfg
+- BLE ACK transmit: stub boundary
+- LCD output: stub boundary
+
 ## Status
 
 This path is intentionally based on the validated Block 1 logic and is now the deployment-oriented default.
