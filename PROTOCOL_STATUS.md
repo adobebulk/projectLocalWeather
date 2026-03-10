@@ -111,6 +111,25 @@ Capabilities:
 
 ---
 
+## Persistence Layer
+
+Status: COMPLETE
+
+Capabilities:
+
+- persists the active RegionalSnapshotV1 and latest PositionUpdateV1
+- restores state across expected power loss and reboot
+- restores the newest valid stored record for weather and position
+- falls back to the last good valid record when a newer stored record is corrupted or interrupted
+- recomputes estimated local conditions after boot restore
+- keeps persistence board-agnostic with an in-memory test backend
+
+Current implementation note:
+
+- hardware-specific flash backend integration is future work
+
+---
+
 ## Packet Ingress Layer
 
 Status: COMPLETE
@@ -148,6 +167,7 @@ Future responsibilities:
 - receive BLE fragments from the iPhone
 - feed fragments into the packet assembler
 - send AckV1 responses
+- integrate board-specific flash persistence backend
 
 ---
 
@@ -183,6 +203,7 @@ The repository currently includes:
 - Rust parser tests
 - Rust interpolation tests
 - Rust device state tests
+- Rust persistence tests
 - assembler tests
 - fixture-based integration tests
 - end-to-end tests verifying:

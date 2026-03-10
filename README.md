@@ -60,7 +60,8 @@ The device firmware is responsible for:
 
 - packet parsing and validation
 - interpolation of local conditions from the stored regional field
-- future device state handling
+- device state handling and estimate recomputation
+- persistence of active weather and latest position across reboot
 - future display logic
 
 At the repository level, the Python implementation acts as the protocol reference, and the Rust implementation follows that reference for firmware-side parsing and interpolation behavior.
@@ -145,6 +146,14 @@ The repository is intended to develop in layers:
 
 This workflow keeps the packet format and validation behavior stable while allowing firmware work to progress incrementally.
 
+Block 1 persistence note:
+
+- the firmware stores the active `RegionalSnapshotV1` and latest `PositionUpdateV1`
+- on boot, it restores the newest valid persisted records and recomputes the estimate
+- if a newer stored record is corrupted, restore falls back to the last good valid record
+- current persistence uses a board-agnostic abstraction with an in-memory test backend
+- hardware-specific flash backend wiring is still future work
+
 ## 7. Running the Python Tests
 
 Run the Python reference implementation tests from the repository root:
@@ -188,11 +197,12 @@ Current repository status:
 - Python protocol reference implementation complete
 - Rust packet parser complete
 - Rust interpolation engine implemented
-- device state logic not yet implemented
+- Rust device state layer implemented
+- persistence layer implemented with board-agnostic abstraction and in-memory test backend
 - BLE transport not yet implemented
 - iPhone application not yet implemented
 
-The next likely engineering areas are device state handling, storage model behavior, and BLE integration.
+The next likely engineering areas are hardware BLE integration, hardware flash backend integration, display logic, and the iPhone application.
 
 ## 10. Design Philosophy
 
