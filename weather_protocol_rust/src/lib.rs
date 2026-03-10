@@ -1,3 +1,4 @@
+pub mod device_state;
 pub mod interpolation;
 
 pub const MAGIC: u16 = 0x5743;
