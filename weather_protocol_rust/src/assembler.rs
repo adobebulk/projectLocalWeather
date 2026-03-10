@@ -37,18 +37,13 @@ impl PacketAssembler {
         }
 
         if self.buffer.is_empty() {
-            if let Some(start_offset) = find_magic_start(chunk) {
-                if start_offset != 0 {
-                    self.reset();
-                    return AssemblerResult::Malformed(AssemblerError::MalformedStart);
-                }
-            } else {
-                self.reset();
-                return AssemblerResult::Malformed(AssemblerError::MalformedStart);
+            self.extend_from_magic_start(chunk);
+            if self.buffer.is_empty() {
+                return self.need_more();
             }
+        } else {
+            self.buffer.extend_from_slice(chunk);
         }
-
-        self.buffer.extend_from_slice(chunk);
 
         if self.expected_total_length.is_none() && self.buffer.len() >= HEADER_SIZE {
             let total_length = u16::from_le_bytes([self.buffer[4], self.buffer[5]]);
@@ -64,18 +59,20 @@ impl PacketAssembler {
         }
 
         if let Some(expected_total_length) = self.expected_total_length {
-            if self.buffer.len() == expected_total_length {
-                let packet = std::mem::take(&mut self.buffer);
+            if self.buffer.len() >= expected_total_length {
+                let packet = self.buffer[..expected_total_length].to_vec();
+                let trailing_bytes = self.buffer[expected_total_length..].to_vec();
+                self.buffer.clear();
                 self.expected_total_length = None;
-                return AssemblerResult::PacketComplete(packet);
-            }
 
-            if self.buffer.len() > expected_total_length {
-                let trailing_bytes = self.buffer.len() - expected_total_length;
-                self.reset();
-                return AssemblerResult::Malformed(AssemblerError::TrailingBytesAfterPacket(
-                    trailing_bytes,
-                ));
+                if !trailing_bytes.is_empty() {
+                    self.extend_from_magic_start(&trailing_bytes);
+                    if let Err(result) = self.prime_expected_total_length() {
+                        return result;
+                    }
+                }
+
+                return AssemblerResult::PacketComplete(packet);
             }
         }
 
@@ -100,6 +97,33 @@ impl PacketAssembler {
             bytes_collected: self.buffer.len(),
             expected_total_length: self.expected_total_length,
         }
+    }
+
+    fn extend_from_magic_start(&mut self, bytes: &[u8]) {
+        if let Some(start_offset) = find_magic_start(bytes) {
+            self.buffer.extend_from_slice(&bytes[start_offset..]);
+        }
+    }
+
+    fn prime_expected_total_length(&mut self) -> Result<(), AssemblerResult> {
+        if self.expected_total_length.is_none() && self.buffer.len() >= HEADER_SIZE {
+            let total_length = u16::from_le_bytes([self.buffer[4], self.buffer[5]]);
+            if usize::from(total_length) < HEADER_SIZE {
+                self.reset();
+                return Err(AssemblerResult::Malformed(AssemblerError::WrongTotalLength(
+                    total_length,
+                )));
+            }
+            if usize::from(total_length) > MAX_PACKET_SIZE {
+                self.reset();
+                return Err(AssemblerResult::Malformed(AssemblerError::PacketTooLarge(
+                    total_length,
+                )));
+            }
+            self.expected_total_length = Some(usize::from(total_length));
+        }
+
+        Ok(())
     }
 }
 
@@ -181,12 +205,15 @@ mod tests {
     }
 
     #[test]
-    fn malformed_start_bytes_are_rejected() {
+    fn leading_garbage_before_valid_packet_is_ignored() {
+        let packet = load_fixture("valid_position.bin");
         let mut assembler = PacketAssembler::new();
+        let mut chunk = vec![0x00, 0x01, 0x02, 0x03, 0x04];
+        chunk.extend_from_slice(&packet);
 
-        let result = assembler.push_bytes(&[0x00, 0x01, 0x02, 0x03]);
+        let result = assembler.push_bytes(&chunk);
 
-        assert_eq!(result, AssemblerResult::Malformed(AssemblerError::MalformedStart));
+        assert_eq!(result, AssemblerResult::PacketComplete(packet));
         assert_eq!(assembler.bytes_collected(), 0);
     }
 
@@ -204,6 +231,44 @@ mod tests {
         );
         assert_eq!(assembler.bytes_collected(), 0);
         assert_eq!(assembler.expected_total_length(), None);
+    }
+
+    #[test]
+    fn valid_packet_followed_by_partial_next_packet_is_retained() {
+        let first_packet = load_fixture("valid_position.bin");
+        let second_packet = load_fixture("valid_ack.bin");
+        let mut assembler = PacketAssembler::new();
+        let mut chunk = first_packet.clone();
+        chunk.extend_from_slice(&second_packet[..10]);
+
+        let first_result = assembler.push_bytes(&chunk);
+
+        assert_eq!(first_result, AssemblerResult::PacketComplete(first_packet));
+        assert_eq!(assembler.bytes_collected(), 10);
+        assert_eq!(assembler.expected_total_length(), None);
+
+        let second_result = assembler.push_bytes(&second_packet[10..]);
+
+        assert_eq!(second_result, AssemblerResult::PacketComplete(second_packet));
+    }
+
+    #[test]
+    fn valid_packet_followed_by_full_next_packet_start_bytes_are_retained() {
+        let first_packet = load_fixture("valid_position.bin");
+        let second_packet = load_fixture("valid_ack.bin");
+        let mut assembler = PacketAssembler::new();
+        let mut chunk = first_packet.clone();
+        chunk.extend_from_slice(&second_packet[..2]);
+
+        let first_result = assembler.push_bytes(&chunk);
+
+        assert_eq!(first_result, AssemblerResult::PacketComplete(first_packet));
+        assert_eq!(assembler.bytes_collected(), 2);
+        assert_eq!(assembler.expected_total_length(), None);
+
+        let second_result = assembler.push_bytes(&second_packet[2..]);
+
+        assert_eq!(second_result, AssemblerResult::PacketComplete(second_packet));
     }
 
     #[test]
