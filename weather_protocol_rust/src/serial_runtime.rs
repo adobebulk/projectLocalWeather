@@ -1,25 +1,19 @@
 use crate::assembler::AssemblerResult;
 use crate::core::{FirmwareCore, FirmwareCoreError};
 use crate::display::DisplayLines;
-use crate::driver::{DisplayError, TextDisplay};
+use crate::driver::{DisplayError, LoggableDisplay, TextDisplay};
 use crate::parse_ack_v1;
 use crate::persistence::{PersistenceBackend, StatePersistence};
-use std::cell::RefCell;
-use std::rc::Rc;
 
 /// Simple display implementation that records serial-style log entries.
-#[derive(Debug, Clone)]
+#[derive(Debug, Default)]
 pub struct SerialDisplay {
-    log: Rc<RefCell<Vec<String>>>,
+    log: Vec<String>,
 }
 
 impl SerialDisplay {
-    pub fn new(log: Rc<RefCell<Vec<String>>>) -> Self {
-        Self { log }
-    }
-
-    pub fn logs(&self) -> Rc<RefCell<Vec<String>>> {
-        Rc::clone(&self.log)
+    pub fn new() -> Self {
+        Self { log: Vec::new() }
     }
 }
 
@@ -38,9 +32,14 @@ impl TextDisplay for SerialDisplay {
             });
         }
         self.log
-            .borrow_mut()
             .push(format!("DISPLAY | {} | {}", lines.line1, lines.line2));
         Ok(())
+    }
+}
+
+impl LoggableDisplay for SerialDisplay {
+    fn drain_logs(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.log)
     }
 }
 
@@ -50,7 +49,7 @@ where
     B: PersistenceBackend + Clone,
 {
     core: FirmwareCore<B, SerialDisplay>,
-    display_log: Rc<RefCell<Vec<String>>>,
+    display_log: Vec<String>,
     ack_log: Vec<String>,
     last_logged_ack: Option<Vec<u8>>,
 }
@@ -60,13 +59,12 @@ where
     B: PersistenceBackend + Clone,
 {
     pub fn new(backend: B) -> Self {
-        let display_log = Rc::new(RefCell::new(Vec::new()));
-        let display = SerialDisplay::new(display_log.clone());
+        let display = SerialDisplay::new();
         let persistence = StatePersistence::new(backend);
         let core = FirmwareCore::new(persistence, display);
         Self {
             core,
-            display_log,
+            display_log: Vec::new(),
             ack_log: Vec::new(),
             last_logged_ack: None,
         }
@@ -74,6 +72,7 @@ where
 
     pub fn restore_on_boot(&mut self, now_unix_timestamp: u32) -> Result<(), FirmwareCoreError> {
         self.core.restore_on_boot(now_unix_timestamp)?;
+        self.flush_display_logs();
         Ok(())
     }
 
@@ -83,16 +82,22 @@ where
         now_unix_timestamp: u32,
     ) -> Result<AssemblerResult, FirmwareCoreError> {
         let result = self.core.push_transport_bytes(chunk, now_unix_timestamp)?;
+        self.flush_display_logs();
         self.capture_ack_log();
         Ok(result)
     }
 
-    pub fn logs(&self) -> Vec<String> {
-        self.display_log.borrow().clone()
+    pub fn logs(&self) -> &[String] {
+        &self.display_log
     }
 
     pub fn ack_logs(&self) -> &[String] {
         &self.ack_log
+    }
+
+    fn flush_display_logs(&mut self) {
+        let new_entries = self.core.take_display_logs();
+        self.display_log.extend(new_entries);
     }
 
     fn capture_ack_log(&mut self) {
