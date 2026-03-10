@@ -1,4 +1,5 @@
 pub mod device_state;
+pub mod ingress;
 pub mod interpolation;
 
 pub const MAGIC: u16 = 0x5743;
@@ -7,6 +8,17 @@ pub const VERSION: u8 = 1;
 pub const PACKET_TYPE_REGIONAL_SNAPSHOT_V1: u8 = 1;
 pub const PACKET_TYPE_POSITION_UPDATE_V1: u8 = 2;
 pub const PACKET_TYPE_ACK_V1: u8 = 3;
+
+pub const STATUS_ACCEPTED: u8 = 0;
+pub const STATUS_BAD_MAGIC: u8 = 1;
+pub const STATUS_UNSUPPORTED_VERSION: u8 = 2;
+pub const STATUS_WRONG_LENGTH: u8 = 3;
+pub const STATUS_BAD_CHECKSUM: u8 = 4;
+pub const STATUS_UNSUPPORTED_PACKET_TYPE: u8 = 5;
+pub const STATUS_SEMANTIC_VALIDATION_FAILED: u8 = 6;
+pub const STATUS_STALE_OR_REPLAYED_SEQUENCE: u8 = 7;
+pub const STATUS_STORAGE_FAILURE: u8 = 8;
+pub const STATUS_INTERNAL_BUSY: u8 = 9;
 
 pub const FIELD_WIDTH_MI: u16 = 240;
 pub const FIELD_HEIGHT_MI: u16 = 240;

@@ -2,9 +2,11 @@ use std::fs;
 use std::path::PathBuf;
 
 use weather_protocol_rust::device_state::DeviceState;
+use weather_protocol_rust::ingress::{IngressResult, PacketIngress};
 use weather_protocol_rust::{
     crc32_with_zeroed_checksum, parse_ack_v1, parse_packet, parse_position_update_v1,
     parse_regional_snapshot_v1, ParseError, Packet, CHECKSUM_OFFSET, REGIONAL_PACKET_SIZE,
+    STATUS_ACCEPTED, STATUS_BAD_CHECKSUM,
 };
 
 fn fixture_path(name: &str) -> PathBuf {
@@ -199,4 +201,81 @@ fn end_to_end_fixture_bytes_to_device_state_estimate() {
     assert!(estimate.visibility_m != 0);
     assert!(estimate.precip_prob_pct <= 100);
     assert!(estimate.confidence_score > 0);
+}
+
+#[test]
+fn ingress_valid_weather_packet_updates_state() {
+    let weather_packet = load_fixture("valid_weather.bin");
+    let mut ingress = PacketIngress::new();
+
+    let result = ingress.ingest_packet(&weather_packet, 1_700_000_020);
+
+    match result {
+        IngressResult::Accepted(success) => {
+            assert_eq!(success.accepted_packet_type, 1);
+            assert_eq!(success.ack.status_code, STATUS_ACCEPTED);
+            assert!(ingress.device_state().active_weather_snapshot().is_some());
+            assert!(ingress.device_state().current_estimate().is_none());
+        }
+        other => panic!("expected accepted weather packet, got {:?}", other),
+    }
+}
+
+#[test]
+fn ingress_valid_position_packet_updates_state() {
+    let weather_packet = load_fixture("valid_weather.bin");
+    let position_packet = load_fixture("valid_position.bin");
+    let mut ingress = PacketIngress::new();
+    let _ = ingress.ingest_packet(&weather_packet, 1_700_000_020);
+
+    let result = ingress.ingest_packet(&position_packet, 1_700_000_030);
+
+    match result {
+        IngressResult::Accepted(success) => {
+            assert_eq!(success.accepted_packet_type, 2);
+            assert_eq!(success.ack.status_code, STATUS_ACCEPTED);
+            assert!(ingress.device_state().latest_position_update().is_some());
+            assert!(ingress.device_state().current_estimate().is_some());
+        }
+        other => panic!("expected accepted position packet, got {:?}", other),
+    }
+}
+
+#[test]
+fn ingress_invalid_packet_yields_rejection() {
+    let packet = load_fixture("bad_checksum_weather.bin");
+    let mut ingress = PacketIngress::new();
+
+    let result = ingress.ingest_packet(&packet, 1_700_000_040);
+
+    match result {
+        IngressResult::Rejected(rejection) => {
+            assert_eq!(rejection.ack.status_code, STATUS_BAD_CHECKSUM);
+            assert!(ingress.device_state().active_weather_snapshot().is_none());
+        }
+        other => panic!("expected rejected packet, got {:?}", other),
+    }
+}
+
+#[test]
+fn ingress_ack_data_is_produced_correctly() {
+    let weather_packet = load_fixture("valid_weather.bin");
+    let mut ingress = PacketIngress::new();
+
+    let result = ingress.ingest_packet(&weather_packet, 1_700_000_020);
+
+    let success = match result {
+        IngressResult::Accepted(success) => success,
+        other => panic!("expected accepted weather packet, got {:?}", other),
+    };
+
+    let parsed_ack = parse_ack_v1(&success.ack_bytes).expect("ack bytes should parse");
+
+    assert_eq!(parsed_ack.header.packet_type, 3);
+    assert_eq!(parsed_ack.header.total_length, 32);
+    assert_eq!(parsed_ack.header.sequence, 1);
+    assert_eq!(parsed_ack.echoed_sequence, 3);
+    assert_eq!(parsed_ack.status_code, STATUS_ACCEPTED);
+    assert_eq!(parsed_ack.active_weather_timestamp_unix, 1_700_000_020);
+    assert_eq!(parsed_ack.active_position_timestamp_unix, 0);
 }
