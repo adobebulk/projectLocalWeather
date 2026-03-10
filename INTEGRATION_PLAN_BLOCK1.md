@@ -1,130 +1,84 @@
-# Weather Computer — Block 1 Hardware Integration Plan
+# Weather Computer — Block 1 Integration Plan (Embedded Rust Primary)
 
-This document captures the remaining Block 1 hardware integration work now that the core software layers are implemented.
+This plan defines the remaining work from the current state to first real hardware deployment using the embedded Rust firmware path.
 
-It is intended as an implementation guide for firmware engineers integrating the existing software stack onto target hardware.
+## 1. Primary Runtime Pipeline
 
-## 1. Block 1 System Overview
-
-Block 1 runtime data path (software pipeline):
+Block 1 runtime pipeline (product path):
 
 BLE fragments  
-→ `BleAdapter`  
-→ `FirmwareCore`  
-→ `PacketAssembler`  
-→ `PacketIngress`  
-→ Parser  
-→ `DeviceState`  
-→ Interpolation  
-→ Display Formatter  
-→ `TextDisplay`
+-> runtime boundary  
+-> packet assembler  
+-> parser / validation  
+-> ingress  
+-> device state  
+-> interpolation  
+-> display formatter  
+-> display output boundary
 
 Persistence path:
 
 accepted packets  
-→ persistence write
+-> persistence write
 
-boot  
-→ persistence restore  
-→ recompute estimate  
-→ display refresh
+Boot path:
 
-## 2. Completed Software Layers
+restore weather + position  
+-> recompute estimate  
+-> refresh display
 
-The following software layers are already implemented and tested:
+## 2. Primary Firmware Location
 
-- Parser: validates header/payload structure, packet type, length, version, magic, and CRC; decodes `RegionalSnapshotV1`, `PositionUpdateV1`, and `AckV1`.
-- Packet Assembler: accepts transport fragments, finds packet start, uses header length, and emits complete packet buffers.
-- Packet Ingress: routes complete packets through parser and state updates, and produces accepted/rejected ACK responses.
-- Device State: stores active weather snapshot and latest position update, tracks update timestamps, and recomputes current estimate.
-- Interpolation Engine: performs spatial/temporal interpolation and local confidence calculation from weather field + position + current time.
-- Persistence Abstraction: stores/restores weather and position using validity metadata and CRC with fallback to last known good record.
-- Display Formatter: deterministically converts estimated conditions into Block 1 16x2 display lines.
-- Display Driver Interface: `TextDisplay` boundary for writing already formatted lines to a display implementation.
-- BLE Adapter Boundary: `ble_adapter` receives board BLE fragments, forwards into `FirmwareCore`, and exposes pending ACK bytes.
-- Firmware Core: central runtime integration layer coordinating assembler, ingress, state updates, interpolation, persistence writes, and display refresh.
+Primary deployable path:
 
-## 3. Remaining Hardware Integration Work
+- [`firmware_esp32/`](/Users/smith/.codex/worktrees/395b/projectLocalWeather/firmware_esp32)
 
-### BLE integration
+This supersedes the previous bridge/Arduino-shell deployment concept.
 
-Implement real Nano ESP32 BLE receive callbacks that pass incoming data to:
+## 3. Completed in Primary Path
 
-`BleAdapter::on_rx_fragment(...)`
+- core packet/data modules recreated in `firmware_esp32`
+- runtime boundary scaffold in Rust (`runtime` + `main`)
+- persistence model present
+- display policy implementation present
+- BLE-facing API boundary shape present
 
-### Flash persistence backend
+## 4. Remaining Hardware Integration Work
 
-Implement a board-specific non-volatile storage backend for the existing persistence abstraction.
+### A. Target Toolchain Build
 
-The backend should replace the in-memory test backend while preserving existing validity, CRC, and fallback behavior.
+Produce target-compatible firmware artifacts for ESP32-S3 from `firmware_esp32`.
 
-### SerLCD driver
+### B. BLE Wiring
 
-Implement a hardware `TextDisplay` implementation for:
+Connect board BLE RX/TX callbacks directly to `firmware_esp32` runtime boundary.
 
-SparkFun 16x2 SerLCD RGB Qwiic
+### C. Persistence Backend Wiring
 
-This driver should only render lines supplied by the display formatter path.
+Replace in-memory persistence backend with board flash-backed implementation.
 
-### Board runtime loop
+### D. Display Transport Wiring
 
-Create a thin firmware loop that coordinates:
+Implement SerLCD transport using already-formatted lines from runtime.
 
-boot  
-→ `restore_on_boot()`
+### E. First End-to-End Device Test
 
-BLE fragment arrives  
-→ `BleAdapter::on_rx_fragment(...)`
+Validate weather snapshot + position ingest, ACK behavior, and display output on hardware.
 
-if adapter has pending ACK  
-→ send ACK over BLE
+## 5. Practical Integration Order
 
-periodically  
-→ write current display lines to LCD
+1. target-toolchain compile of `firmware_esp32`
+2. boot + serial logs on board
+3. BLE fragment ingress on board
+4. ACK transmit path on board
+5. flash-backed persistence wiring
+6. SerLCD output transport wiring
+7. end-to-end field test with phone sender
 
-### iPhone sender (future work)
+## 6. Guardrails
 
-Outside this firmware repository, the iPhone companion will:
-
-- fetch NOAA weather data
-- build protocol packets
-- transmit packets via BLE
-
-## 4. Integration Order
-
-Recommended order for remaining Block 1 hardware integration:
-
-1. serial console bring-up
-2. minimal firmware loop
-3. BLE receive path
-4. persistence backend
-5. LCD driver
-6. end-to-end device test
-
-## 5. Firmware Runtime Example
-
-```rust
-loop {
-    if ble_fragment_received {
-        adapter.on_rx_fragment(bytes, now);
-    }
-
-    if let Some(ack) = adapter.take_pending_ack() {
-        send_ble_ack(ack);
-    }
-
-    if let Some(lines) = adapter.current_display_lines() {
-        display.write_lines(lines);
-    }
-}
-```
-
-## 6. Design Philosophy
-
-Block 1 integration follows these architecture principles:
-
-- protocol logic is transport-agnostic
-- firmware core is platform-independent
-- BLE adapter is a thin boundary layer
-- display formatting is deterministic
-- persistence guarantees power-loss resilience
+- do not redesign protocol
+- do not redesign weather model
+- keep confidence off-wire
+- keep code explicit and testable
+- avoid parallel duplicate firmware paths
