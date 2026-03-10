@@ -1,5 +1,6 @@
 pub mod assembler;
 pub mod ble_adapter;
+pub mod board;
 pub mod core;
 pub mod device_state;
 pub mod display;

@@ -1,40 +1,75 @@
-use firmware_esp32::assembler::AssemblerResult;
+use firmware_esp32::board::{
+    BleAckTransmitter, Esp32BoardApp, LcdOutput, SerialLogger, TimestampSource,
+};
 use firmware_esp32::persistence::InMemoryPersistenceBackend;
 use firmware_esp32::runtime::FirmwareRuntime;
 
+#[derive(Default)]
+struct StdoutSerial;
+
+impl SerialLogger for StdoutSerial {
+    fn log(&mut self, message: &str) {
+        println!("{}", message);
+    }
+}
+
+#[derive(Default)]
+struct StdoutAckTx;
+
+impl BleAckTransmitter for StdoutAckTx {
+    fn send_ack(&mut self, ack_bytes: &[u8]) {
+        println!("BLE ACK TX bytes={}", ack_bytes.len());
+    }
+}
+
+#[derive(Default)]
+struct StdoutLcd;
+
+impl LcdOutput for StdoutLcd {
+    fn write_lines(&mut self, line1: &str, line2: &str) {
+        println!("LCD:");
+        println!("{}", line1);
+        println!("{}", line2);
+    }
+}
+
+struct CounterClock {
+    now: u32,
+}
+
+impl CounterClock {
+    fn new(start: u32) -> Self {
+        Self { now: start }
+    }
+}
+
+impl TimestampSource for CounterClock {
+    fn now_unix(&mut self) -> u32 {
+        self.now = self.now.saturating_add(1);
+        self.now
+    }
+}
+
 fn main() {
-    // Boot scaffold for first hardware-deployment attempts.
-    // Replace stdout logging with board serial output in target integration.
-    let mut runtime = FirmwareRuntime::new(InMemoryPersistenceBackend::default());
-    let mut now_unix: u32 = 1_700_000_000;
+    // Minimal board-like bootstrap for first deployment attempts.
+    let runtime = FirmwareRuntime::new(InMemoryPersistenceBackend::default());
+    let serial = StdoutSerial;
+    let ack_tx = StdoutAckTx;
+    let lcd = StdoutLcd;
+    let clock = CounterClock::new(1_700_000_000);
+    let mut app = Esp32BoardApp::new(runtime, serial, ack_tx, lcd, clock);
 
-    println!("BOOT start");
-    match runtime.restore_on_boot(now_unix) {
-        Ok(()) => println!("BOOT restore rc=0"),
-        Err(error) => println!("BOOT restore error: {:?}", error),
+    if let Err(error) = app.boot() {
+        println!("BOOT error: {:?}", error);
     }
 
-    if runtime.current_display_lines().is_none() {
-        println!("DISPLAY none");
+    // BLE callback shape:
+    // board RX callback should pass actual fragments here.
+    let fragment: [u8; 0] = [];
+    if let Err(error) = app.on_ble_rx_fragment(&fragment) {
+        println!("RX error: {:?}", error);
     }
 
-    // Loop shape for board integration:
-    // 1. receive BLE fragment bytes
-    // 2. call runtime.on_ble_fragment(...)
-    // 3. if ACK available, send over BLE
-    // 4. if display lines available, write to LCD
-    let fake_fragment: [u8; 0] = [];
-    now_unix = now_unix.saturating_add(1);
-    match runtime.on_ble_fragment(&fake_fragment, now_unix) {
-        Ok(AssemblerResult::NeedMore { .. }) => println!("RX need more"),
-        Ok(AssemblerResult::PacketComplete(_)) => println!("RX packet complete"),
-        Ok(AssemblerResult::Malformed(error)) => println!("RX malformed: {:?}", error),
-        Err(error) => println!("RX error: {:?}", error),
-    }
-
-    if let Some(ack) = runtime.take_pending_ack() {
-        println!("ACK bytes={}", ack.len());
-    } else {
-        println!("ACK none");
-    }
+    // Periodic display refresh shape:
+    app.refresh_display_output();
 }

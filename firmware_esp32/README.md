@@ -19,6 +19,15 @@ This firmware crate contains the runtime architecture used by the product path:
 - BLE-facing runtime boundary
 - boot/runtime loop scaffold
 
+Board integration seam:
+
+- `src/board.rs`
+  - serial logging adapter boundary
+  - BLE RX fragment callback boundary
+  - BLE ACK transmit boundary
+  - I2C LCD output boundary
+  - timestamp source boundary
+
 ## Status
 
 This path is intentionally based on the validated Block 1 logic and is now the deployment-oriented default.
