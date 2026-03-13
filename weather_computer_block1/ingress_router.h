@@ -8,6 +8,7 @@
 namespace ingress_router {
 
 void handlePacket(const protocol_parser::ParseResult& result, Stream& serial);
+void recomputeFromState(Stream& serial);
 
 }  // namespace ingress_router
 

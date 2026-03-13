@@ -4,6 +4,7 @@
 #include "display_formatter.h"
 #include "device_state.h"
 #include "interpolation.h"
+#include "persistence.h"
 
 namespace {
 
@@ -97,6 +98,7 @@ void handlePacket(const protocol_parser::ParseResult& result, Stream& serial) {
     state->position_timestamp = result.position.header.timestamp_unix;
     state->has_position = true;
     serial.println("INGRESS: stored position update");
+    persistence::savePositionUpdate(state->position, serial);
     recomputeEstimate(state, serial);
     return;
   }
@@ -106,6 +108,7 @@ void handlePacket(const protocol_parser::ParseResult& result, Stream& serial) {
     state->weather_timestamp = result.regional_snapshot.header.timestamp_unix;
     state->has_weather = true;
     serial.println("INGRESS: stored weather snapshot");
+    persistence::saveWeatherSnapshot(state->weather, serial);
     recomputeEstimate(state, serial);
     return;
   }
@@ -114,6 +117,10 @@ void handlePacket(const protocol_parser::ParseResult& result, Stream& serial) {
     serial.println("INGRESS: ack ignored");
     return;
   }
+}
+
+void recomputeFromState(Stream& serial) {
+  recomputeEstimate(device_state::mutableState(), serial);
 }
 
 }  // namespace ingress_router
