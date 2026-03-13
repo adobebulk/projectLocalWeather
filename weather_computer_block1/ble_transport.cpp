@@ -18,7 +18,7 @@
 namespace {
 
 constexpr char kDeviceName[] = "WeatherComputer";
-constexpr size_t kRxBufferSize = 128;
+constexpr size_t kRxBufferSize = 512;
 constexpr size_t kHexPreviewBytes = 16;
 
 constexpr char kServiceUuid[] = "19B10010-E8F2-537E-4F6C-D104768A1214";
@@ -145,13 +145,13 @@ class RxCallbacks : public BLECharacteristicCallbacks {
     }
 
     if (g_serial != nullptr) {
-      g_serial->print("BLE: rx ");
+      g_serial->print("BLE: rx chunk ");
       g_serial->print(incoming_length);
       g_serial->println(" bytes");
     }
 
     if (incoming_length > kRxBufferSize && g_serial != nullptr) {
-      g_serial->print("BLE: rx truncated to ");
+      g_serial->print("BLE: rx chunk truncated to ");
       g_serial->print(kRxBufferSize);
       g_serial->println(" bytes");
     }
