@@ -1,3 +1,0 @@
-[target.xtensa-esp32s3-none-elf]
-# Placeholder runner for future board tooling integration.
-runner = "echo"
