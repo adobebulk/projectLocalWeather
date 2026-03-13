@@ -11,6 +11,7 @@
 #include <BLEUtils.h>
 
 #include "packet_assembler.h"
+#include "protocol_parser.h"
 
 namespace {
 
@@ -110,6 +111,10 @@ void logAssemblerResult(const packet_assembler::FeedResult& result) {
   }
 }
 
+void logParserResult(const protocol_parser::ParseResult& result) {
+  logLine(protocol_parser::statusToLogMessage(result.status, result.header.packet_type));
+}
+
 class ServerCallbacks : public BLEServerCallbacks {
  public:
   void onConnect(BLEServer* server) override {
@@ -154,6 +159,10 @@ class RxCallbacks : public BLECharacteristicCallbacks {
         packet_assembler::pushFragment(g_rx_buffer, g_rx_length);
     logAssemblerResult(assembler_result);
     if (packet_assembler::hasCompletePacket()) {
+      const protocol_parser::ParseResult parse_result =
+          protocol_parser::parsePacket(packet_assembler::completePacketData(),
+                                       packet_assembler::completePacketLength());
+      logParserResult(parse_result);
       packet_assembler::consumePacket();
     }
     sendAck();
