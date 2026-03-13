@@ -6,7 +6,7 @@ This firmware runs on an Arduino Nano ESP32 and provides offline weather situati
 
 The firmware maintains a local weather model on the device rather than storing a single forecast point. The phone periodically downloads weather data, constructs a regional field, and sends that field plus vehicle position updates to the device over BLE. The device keeps the latest field and position in memory, restores them after reboot when available, and recomputes a local estimate for display.
 
-The regional weather field is a 3×3 anchor grid. Each anchor contains three forecast slots at 0, 60, and 120 minutes. The full grid covers roughly 240 miles across, or about a 120 mile radius around the field center. The phone periodically sends:
+The regional weather field is a 3x3 anchor grid. Each anchor contains three forecast slots at 0, 60, and 120 minutes. The full grid covers roughly 240 miles across, or about a 120 mile radius around the field center. The phone periodically sends:
 
 - regional weather snapshots
 - vehicle GPS position updates
@@ -42,7 +42,7 @@ Reasons:
 
 SparkFun 16x2 SerLCD RGB Qwiic character LCD.
 
-Connected via I²C.
+Connected via I2C.
 
 Typical wiring:
 
@@ -54,7 +54,7 @@ SCL (Qwiic) --> SCL
 GND         --> GND
 ```
 
-Default display I²C address:
+Default display I2C address:
 
 `0x72`
 
@@ -101,7 +101,7 @@ Stores latest position, latest weather snapshot, and the computed estimate.
 Computes local weather conditions from the regional grid.
 
 `Display Formatter`  
-Converts the estimate into the 16×2 LCD layout.
+Converts the estimate into the 16x2 LCD layout.
 
 `Persistence`  
 Stores weather and position in ESP32 NVS so the device can restore state after power loss.
@@ -143,7 +143,7 @@ Packet size:
 Contains:
 
 - weather field metadata
-- 3×3 anchor grid
+- 3x3 anchor grid
 - 3 forecast slots per anchor
 
 Packet size:
@@ -164,7 +164,7 @@ Packet size:
 
 Compact coded strip:
 
-`visibility → phenomenon → wind`
+`visibility -> phenomenon -> wind`
 
 Example:
 
@@ -198,8 +198,8 @@ Weather and position are stored in ESP32 NVS.
 
 Two-slot redundancy scheme:
 
-`wx0 / wx1` → weather snapshots  
-`ps0 / ps1` → position updates
+`wx0 / wx1` -> weather snapshots  
+`ps0 / ps1` -> position updates
 
 Newest valid generation is selected during restore.
 
