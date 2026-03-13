@@ -171,6 +171,41 @@ bool restoreWithTwoSlots(const char* key0, const char* key1, Payload* out_payloa
   return true;
 }
 
+bool removeKey(const char* key) {
+  Preferences preferences;
+  if (!preferences.begin(kNamespace, false)) {
+    return false;
+  }
+  const bool success = preferences.remove(key);
+  preferences.end();
+  return success;
+}
+
+template <typename Payload>
+bool corruptSlot(const char* key) {
+  Preferences preferences;
+  if (!preferences.begin(kNamespace, false)) {
+    return false;
+  }
+
+  PersistRecord<Payload> record = {};
+  if (preferences.getBytesLength(key) != sizeof(PersistRecord<Payload>)) {
+    preferences.end();
+    return false;
+  }
+
+  if (preferences.getBytes(key, &record, sizeof(PersistRecord<Payload>)) !=
+      sizeof(PersistRecord<Payload>)) {
+    preferences.end();
+    return false;
+  }
+
+  record.header.payload_crc32 ^= 0xFFFFFFFFUL;
+  const bool success = preferences.putBytes(key, &record, sizeof(record)) == sizeof(record);
+  preferences.end();
+  return success;
+}
+
 }  // namespace
 
 namespace persistence {
@@ -223,6 +258,57 @@ void restoreDeviceState(Stream& serial) {
   }
 
   serial.println("PERSIST: restore complete");
+}
+
+void clearAllRecords(Stream& serial) {
+  clearWeatherRecords(serial);
+  clearPositionRecords(serial);
+}
+
+void clearWeatherRecords(Stream& serial) {
+  const bool slot0_removed = removeKey(kWeatherSlot0Key);
+  const bool slot1_removed = removeKey(kWeatherSlot1Key);
+  if (slot0_removed || slot1_removed) {
+    serial.println("PERSIST: weather records cleared");
+    return;
+  }
+  serial.println("PERSIST: weather records already clear");
+}
+
+void clearPositionRecords(Stream& serial) {
+  const bool slot0_removed = removeKey(kPositionSlot0Key);
+  const bool slot1_removed = removeKey(kPositionSlot1Key);
+  if (slot0_removed || slot1_removed) {
+    serial.println("PERSIST: position records cleared");
+    return;
+  }
+  serial.println("PERSIST: position records already clear");
+}
+
+bool corruptWeatherSlotForTest(uint8_t slot_index, Stream& serial) {
+  const char* key = slot_index == 0 ? kWeatherSlot0Key : kWeatherSlot1Key;
+  const bool success = corruptSlot<protocol_parser::RegionalSnapshotV1>(key);
+  if (success) {
+    serial.print("PERSIST: weather slot corrupted ");
+    serial.println(slot_index);
+    return true;
+  }
+  serial.print("PERSIST: weather slot corrupt failed ");
+  serial.println(slot_index);
+  return false;
+}
+
+bool corruptPositionSlotForTest(uint8_t slot_index, Stream& serial) {
+  const char* key = slot_index == 0 ? kPositionSlot0Key : kPositionSlot1Key;
+  const bool success = corruptSlot<protocol_parser::PositionUpdateV1>(key);
+  if (success) {
+    serial.print("PERSIST: position slot corrupted ");
+    serial.println(slot_index);
+    return true;
+  }
+  serial.print("PERSIST: position slot corrupt failed ");
+  serial.println(slot_index);
+  return false;
 }
 
 }  // namespace persistence
