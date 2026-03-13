@@ -7,6 +7,7 @@
 
 namespace {
 
+// Temporary hardware-validation switch. Keep disabled for production firmware builds.
 constexpr bool kEnableDebugSeed = false;
 
 protocol_parser::WeatherSlot makeWeatherSlot(
@@ -89,6 +90,8 @@ void maybeInject(Stream& serial) {
     return;
   }
 
+  // This path intentionally reuses ingress handling so seeded data exercises
+  // the same recompute, persistence, and display updates as real packets.
   serial.println("DEBUG: seed enabled");
 
   protocol_parser::ParseResult weather_result = {};

@@ -53,6 +53,8 @@ char intensityMarker(uint8_t precip_intensity) {
 }
 
 bool phenomenonCode(const interpolation::LocalEstimate& estimate, char* out_code) {
+  // Hazard mapping is intentionally conservative: any thunder-related flag
+  // takes precedence over precip-kind-derived phenomena on Line 1.
   const bool thunder = hasHazard(estimate.hazard_flags, 0) || hasHazard(estimate.hazard_flags, 1);
   const bool icing = estimate.precip_kind == 4 || hasHazard(estimate.hazard_flags, 5);
   const bool snow = estimate.precip_kind == 2;
@@ -171,6 +173,7 @@ void buildLine1(const interpolation::LocalEstimate& estimate, char* out_line) {
 }
 
 const char* interpretationText(const interpolation::LocalEstimate& estimate) {
+  // Line 2 keeps a single dominant interpretation to preserve space for CXX%.
   if (hasHazard(estimate.hazard_flags, 0) || hasHazard(estimate.hazard_flags, 1)) {
     return "THUNDER";
   }

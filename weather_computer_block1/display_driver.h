@@ -7,8 +7,8 @@ namespace display_driver {
 
 // Expected library: SparkFun SerLCD Arduino Library 1.0.9 (<SerLCD.h>).
 // Expected default I2C address for the SerLCD backpack: 0x72.
-// Successful Stage 1 bring-up should show BOOT start, I2C init, I2C scan,
-// LCD init success, DISPLAY write success, and BOOT complete on serial.
+// Bring-up logs should show BOOT start, I2C init, I2C scan, LCD init success,
+// and DISPLAY write success on serial.
 
 bool initI2c(Stream& serial);
 bool scanI2cBus(Stream& serial);

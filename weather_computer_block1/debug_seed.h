@@ -5,6 +5,7 @@
 
 namespace debug_seed {
 
+// Temporary hardware-validation helper. Not used by the normal production boot path.
 bool isEnabled();
 void maybeInject(Stream& serial);
 

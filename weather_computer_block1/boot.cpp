@@ -3,7 +3,6 @@
 #include <Arduino.h>
 
 #include "ble_transport.h"
-#include "debug_seed.h"
 #include "display_driver.h"
 #include "ingress_router.h"
 #include "persistence.h"
@@ -63,7 +62,6 @@ void boot() {
 
   persistence::restoreDeviceState(Serial);
   ingress_router::recomputeFromState(Serial);
-  debug_seed::maybeInject(Serial);
   Serial.println("BOOT: complete");
 }
 
