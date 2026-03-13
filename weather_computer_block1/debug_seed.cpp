@@ -7,7 +7,7 @@
 
 namespace {
 
-constexpr bool kEnableDebugSeed = false;
+constexpr bool kEnableDebugSeed = true;
 
 protocol_parser::WeatherSlot makeWeatherSlot(
     uint16_t slot_offset_min,

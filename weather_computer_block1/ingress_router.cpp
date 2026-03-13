@@ -1,5 +1,7 @@
 #include "ingress_router.h"
 
+#include "display_driver.h"
+#include "display_formatter.h"
 #include "device_state.h"
 #include "interpolation.h"
 
@@ -25,6 +27,27 @@ void logEstimate(const interpolation::LocalEstimate& estimate, Stream& serial) {
   serial.print(estimate.hazard_flags, HEX);
   serial.print(" confidence=");
   serial.println(estimate.confidence_score);
+}
+
+void updateRuntimeDisplay(const interpolation::LocalEstimate& estimate, Stream& serial) {
+  if (!display_driver::isReady()) {
+    serial.println("DISPLAY: runtime update skipped, LCD not ready");
+    return;
+  }
+
+  const display_formatter::DisplayLines lines = display_formatter::formatEstimate(estimate);
+  serial.println("DISPLAY: runtime update start");
+  serial.print("DISPLAY: line1=");
+  serial.println(lines.line1);
+  serial.print("DISPLAY: line2=");
+  serial.println(lines.line2);
+
+  if (display_driver::writeLines(lines.line1, lines.line2)) {
+    serial.println("DISPLAY: runtime update success");
+    return;
+  }
+
+  serial.println("DISPLAY: runtime update failure");
 }
 
 void recomputeEstimate(device_state::DeviceState* state, Stream& serial) {
@@ -55,6 +78,7 @@ void recomputeEstimate(device_state::DeviceState* state, Stream& serial) {
   state->estimate_timestamp = recompute_timestamp;
   serial.println("ESTIMATE: success");
   logEstimate(state->estimate, serial);
+  updateRuntimeDisplay(state->estimate, serial);
 }
 
 }  // namespace
