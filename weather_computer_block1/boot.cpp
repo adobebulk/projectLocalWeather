@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 
+#include "ble_transport.h"
 #include "display_driver.h"
 
 namespace {
@@ -45,15 +46,23 @@ void boot() {
   Serial.println("DISPLAY: write start");
   if (display_driver::writeLines("WEATHER NODE", "BOOT OK")) {
     Serial.println("DISPLAY: write success");
-    Serial.println("BOOT: complete");
+  } else {
+    Serial.println("DISPLAY: write failure");
+    Serial.println("BOOT: complete with errors");
     return;
   }
 
-  Serial.println("DISPLAY: write failure");
-  Serial.println("BOOT: complete with errors");
+  const bool ble_ready = ble_transport::begin(Serial);
+  if (!ble_ready) {
+    Serial.println("BOOT: complete with errors");
+    return;
+  }
+
+  Serial.println("BOOT: complete");
 }
 
 void tick() {
+  ble_transport::tick(Serial);
   delay(kIdleDelayMs);
 }
 
