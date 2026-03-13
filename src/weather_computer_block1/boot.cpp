@@ -1,8 +1,8 @@
-#include "runtime/boot.h"
+#include "boot.h"
 
 #include <Arduino.h>
 
-#include "display_driver/display_driver.h"
+#include "display_driver.h"
 
 namespace {
 

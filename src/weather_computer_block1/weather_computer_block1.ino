@@ -1,4 +1,6 @@
-#include "runtime/boot.h"
+#include <SerLCD.h>
+
+#include "boot.h"
 
 void setup() {
   runtime::boot();

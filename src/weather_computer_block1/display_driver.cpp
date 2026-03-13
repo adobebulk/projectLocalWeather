@@ -1,7 +1,7 @@
-#include "display_driver/display_driver.h"
+#include "display_driver.h"
 
 #include <Arduino.h>
-#include <SparkFunSerLCD.h>
+#include <SerLCD.h>
 #include <Wire.h>
 
 namespace {
