@@ -1,6 +1,7 @@
 #include "debug_seed.h"
 
 #include "device_state.h"
+#include "ingress_router.h"
 #include "interpolation.h"
 #include "protocol_parser.h"
 
@@ -79,30 +80,32 @@ void fillSamplePosition(protocol_parser::PositionUpdateV1* position) {
 
 namespace debug_seed {
 
+bool isEnabled() {
+  return kEnableDebugSeed;
+}
+
 void maybeInject(Stream& serial) {
   if (!kEnableDebugSeed) {
     return;
   }
 
-  device_state::DeviceState* state = device_state::mutableState();
-  fillSampleWeather(&state->weather);
-  fillSamplePosition(&state->position);
-  state->has_weather = true;
-  state->has_position = true;
-  state->weather_timestamp = state->weather.header.timestamp_unix;
-  state->position_timestamp = state->position.header.timestamp_unix;
+  serial.println("DEBUG: seed enabled");
 
-  interpolation::LocalEstimate estimate = {};
-  const uint32_t recompute_timestamp =
-      state->weather_timestamp > state->position_timestamp ? state->weather_timestamp
-                                                           : state->position_timestamp;
-  if (interpolation::estimateLocalConditions(state->weather, state->position, recompute_timestamp,
-                                             &estimate) == interpolation::kInterpolationOk) {
-    state->estimate = estimate;
-    state->has_estimate = true;
-    state->estimate_timestamp = recompute_timestamp;
-    serial.println("DEBUG: injected sample weather and position");
-  }
+  protocol_parser::ParseResult weather_result = {};
+  weather_result.status = protocol_parser::kParseOk;
+  weather_result.header.packet_type = protocol_parser::kPacketTypeRegionalSnapshotV1;
+  fillSampleWeather(&weather_result.regional_snapshot);
+  weather_result.header = weather_result.regional_snapshot.header;
+  serial.println("DEBUG: weather seeded");
+  ingress_router::handlePacket(weather_result, serial);
+
+  protocol_parser::ParseResult position_result = {};
+  position_result.status = protocol_parser::kParseOk;
+  position_result.header.packet_type = protocol_parser::kPacketTypePositionUpdateV1;
+  fillSamplePosition(&position_result.position);
+  position_result.header = position_result.position.header;
+  serial.println("DEBUG: position seeded");
+  ingress_router::handlePacket(position_result, serial);
 }
 
 }  // namespace debug_seed

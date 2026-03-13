@@ -5,6 +5,7 @@
 
 namespace debug_seed {
 
+bool isEnabled();
 void maybeInject(Stream& serial);
 
 }  // namespace debug_seed
