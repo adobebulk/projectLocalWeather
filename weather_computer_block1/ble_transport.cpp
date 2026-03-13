@@ -10,6 +10,8 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 
+#include "device_state.h"
+#include "ingress_router.h"
 #include "packet_assembler.h"
 #include "protocol_parser.h"
 
@@ -163,6 +165,7 @@ class RxCallbacks : public BLECharacteristicCallbacks {
           protocol_parser::parsePacket(packet_assembler::completePacketData(),
                                        packet_assembler::completePacketLength());
       logParserResult(parse_result);
+      ingress_router::handlePacket(parse_result, *g_serial);
       packet_assembler::consumePacket();
     }
     sendAck();
@@ -179,6 +182,7 @@ namespace ble_transport {
 bool begin(Stream& serial) {
   g_serial = &serial;
   g_ready = false;
+  device_state::reset();
   packet_assembler::reset();
 
   serial.println("BLE: init start");
