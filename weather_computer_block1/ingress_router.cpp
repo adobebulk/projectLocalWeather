@@ -1,6 +1,63 @@
 #include "ingress_router.h"
 
 #include "device_state.h"
+#include "interpolation.h"
+
+namespace {
+
+void logEstimate(const interpolation::LocalEstimate& estimate, Stream& serial) {
+  serial.print("ESTIMATE: temp_t10=");
+  serial.print(estimate.air_temp_c_tenths);
+  serial.print(" wind_t10=");
+  serial.print(estimate.wind_speed_mps_tenths);
+  serial.print(" gust_t10=");
+  serial.print(estimate.wind_gust_mps_tenths);
+  serial.print(" precip_pct=");
+  serial.print(estimate.precip_prob_pct);
+  serial.print(" kind=");
+  serial.print(estimate.precip_kind);
+  serial.print(" intensity=");
+  serial.println(estimate.precip_intensity);
+
+  serial.print("ESTIMATE: vis_m=");
+  serial.print(estimate.visibility_m);
+  serial.print(" hazard=0x");
+  serial.print(estimate.hazard_flags, HEX);
+  serial.print(" confidence=");
+  serial.println(estimate.confidence_score);
+}
+
+void recomputeEstimate(device_state::DeviceState* state, Stream& serial) {
+  if (!state->has_position || !state->has_weather) {
+    return;
+  }
+
+  const uint32_t recompute_timestamp =
+      state->weather_timestamp > state->position_timestamp ? state->weather_timestamp
+                                                           : state->position_timestamp;
+
+  serial.println("ESTIMATE: recompute start");
+  interpolation::LocalEstimate estimate = {};
+  const interpolation::InterpolationStatus status =
+      interpolation::estimateLocalConditions(state->weather, state->position, recompute_timestamp,
+                                             &estimate);
+
+  if (status != interpolation::kInterpolationOk) {
+    state->has_estimate = false;
+    state->estimate_timestamp = recompute_timestamp;
+    serial.print("ESTIMATE: failed ");
+    serial.println(interpolation::statusToString(status));
+    return;
+  }
+
+  state->estimate = estimate;
+  state->has_estimate = true;
+  state->estimate_timestamp = recompute_timestamp;
+  serial.println("ESTIMATE: success");
+  logEstimate(state->estimate, serial);
+}
+
+}  // namespace
 
 namespace ingress_router {
 
@@ -16,6 +73,7 @@ void handlePacket(const protocol_parser::ParseResult& result, Stream& serial) {
     state->position_timestamp = result.position.header.timestamp_unix;
     state->has_position = true;
     serial.println("INGRESS: stored position update");
+    recomputeEstimate(state, serial);
     return;
   }
 
@@ -24,6 +82,7 @@ void handlePacket(const protocol_parser::ParseResult& result, Stream& serial) {
     state->weather_timestamp = result.regional_snapshot.header.timestamp_unix;
     state->has_weather = true;
     serial.println("INGRESS: stored weather snapshot");
+    recomputeEstimate(state, serial);
     return;
   }
 

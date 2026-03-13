@@ -3,6 +3,7 @@
 #include <Arduino.h>
 
 #include "ble_transport.h"
+#include "debug_seed.h"
 #include "display_driver.h"
 
 namespace {
@@ -58,6 +59,7 @@ void boot() {
     return;
   }
 
+  debug_seed::maybeInject(Serial);
   Serial.println("BOOT: complete");
 }
 
