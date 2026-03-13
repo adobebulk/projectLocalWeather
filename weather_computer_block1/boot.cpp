@@ -29,32 +29,27 @@ void boot() {
     return;
   }
 
-  display_driver::scanI2cBus(Serial);
+  const bool lcd_present = display_driver::scanI2cBus(Serial);
 
   Serial.println("LCD: init start");
-  const bool lcd_ready = display_driver::beginLcd();
-  if (lcd_ready) {
-    Serial.println("LCD: init success");
-  } else {
+  if (!lcd_present) {
     Serial.println("LCD: init failed at address 0x72");
-  }
-
-  if (lcd_ready) {
-    Serial.println("DISPLAY: write start");
-    if (display_driver::writeLines("WEATHER NODE", "BOOT OK")) {
-      Serial.println("DISPLAY: write success");
-    } else {
-      Serial.println("DISPLAY: write failure");
-    }
-  } else {
     Serial.println("DISPLAY: write skipped, LCD not ready");
+    Serial.println("BOOT: complete with errors");
+    return;
   }
 
-  if (i2c_ready && lcd_ready && display_driver::isReady()) {
+  display_driver::beginLcd();
+  Serial.println("LCD: init success");
+
+  Serial.println("DISPLAY: write start");
+  if (display_driver::writeLines("WEATHER NODE", "BOOT OK")) {
+    Serial.println("DISPLAY: write success");
     Serial.println("BOOT: complete");
     return;
   }
 
+  Serial.println("DISPLAY: write failure");
   Serial.println("BOOT: complete with errors");
 }
 

@@ -1,5 +1,3 @@
-#include <SerLCD.h>
-
 #include "boot.h"
 
 void setup() {

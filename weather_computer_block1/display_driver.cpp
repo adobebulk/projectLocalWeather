@@ -10,8 +10,9 @@ constexpr uint8_t kDisplayI2cAddress = 0x72;
 constexpr uint8_t kDisplayColumns = 16;
 constexpr bool kUseExplicitWirePinsFallback = true;
 
-// Keep fallback pin choices here so they are easy to update for board-specific wiring.
-// On Nano ESP32 Qwiic/I2C is commonly routed on SDA=11 and SCL=12.
+// Keep fallback pin choices here so they are easy to change for board-specific wiring.
+// The Nano ESP32 commonly exposes Qwiic/I2C on SDA=11 and SCL=12 if the default
+// Wire pin mapping does not match the connected hardware.
 constexpr uint8_t kQwiicSdaPin = 11;
 constexpr uint8_t kQwiicSclPin = 12;
 
@@ -20,6 +21,7 @@ bool g_ready = false;
 
 void writeLine(uint8_t row, const char* text) {
   lcd.setCursor(0, row);
+
   uint8_t column = 0;
   for (; column < kDisplayColumns; ++column) {
     const char character = text[column];
@@ -52,7 +54,6 @@ bool initI2c(Stream& serial) {
     return false;
   }
 
-  // Fallback for boards/wiring where the default Wire pins are not mapped as expected.
   serial.print("I2C: retry with explicit SDA=");
   serial.print(kQwiicSdaPin);
   serial.print(" SCL=");
@@ -67,45 +68,53 @@ bool initI2c(Stream& serial) {
   return true;
 }
 
-void scanI2cBus(Stream& serial) {
+bool scanI2cBus(Stream& serial) {
   serial.println("I2C: scan start");
 
   uint8_t device_count = 0;
+  bool lcd_found = false;
+
   for (uint8_t address = 1; address < 127; ++address) {
     Wire.beginTransmission(address);
     const uint8_t error = Wire.endTransmission();
-    if (error == 0) {
-      char buffer[32];
-      snprintf(buffer, sizeof(buffer), "I2C: found device at 0x%02X", address);
-      serial.println(buffer);
-      ++device_count;
+    if (error != 0) {
+      continue;
     }
+
+    char buffer[32];
+    snprintf(buffer, sizeof(buffer), "I2C: found device at 0x%02X", address);
+    serial.println(buffer);
+
+    if (address == kDisplayI2cAddress) {
+      lcd_found = true;
+    }
+
+    ++device_count;
   }
 
   if (device_count == 0) {
     serial.println("I2C: no devices found");
-    return;
+    return false;
   }
 
   serial.print("I2C: scan complete, ");
   serial.print(device_count);
   serial.println(" device(s) found");
+  return lcd_found;
 }
 
-bool beginLcd() {
+void beginLcd() {
   g_ready = false;
   delay(50);
 
-  if (!lcd.begin(Wire, kDisplayI2cAddress)) {
-    return false;
-  }
-
+  // SerLCD library 1.0.9 exposes begin() as void, so device presence is checked
+  // with the I2C scanner before calling this.
+  lcd.begin(Wire, kDisplayI2cAddress);
   lcd.setBacklight(0, 64, 96);
   lcd.clear();
   lcd.setContrast(5);
   lcd.setCursor(0, 0);
   g_ready = true;
-  return true;
 }
 
 bool writeLines(const char* line1, const char* line2) {
