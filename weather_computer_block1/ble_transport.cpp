@@ -10,6 +10,8 @@
 #include <BLEServer.h>
 #include <BLEUtils.h>
 
+#include "packet_assembler.h"
+
 namespace {
 
 constexpr char kDeviceName[] = "WeatherComputer";
@@ -76,6 +78,38 @@ void sendAck() {
   logLine("BLE: tx ACK queued, no subscriber");
 }
 
+void logAssemblerResult(const packet_assembler::FeedResult& result) {
+  if (g_serial == nullptr) {
+    return;
+  }
+
+  g_serial->print("ASSEMBLER: fragment len=");
+  g_serial->println(result.fragment_length);
+
+  if (result.dropped_garbage_bytes > 0) {
+    g_serial->print("ASSEMBLER: dropped garbage len=");
+    g_serial->println(result.dropped_garbage_bytes);
+  }
+
+  g_serial->print("ASSEMBLER: buffered=");
+  g_serial->println(result.bytes_buffered);
+
+  if (result.expected_length_known) {
+    g_serial->print("ASSEMBLER: expected len=");
+    g_serial->println(result.expected_packet_length);
+  }
+
+  if (result.malformed_start) {
+    g_serial->print("ASSEMBLER: malformed start len=");
+    g_serial->println(result.expected_packet_length);
+  }
+
+  if (result.packet_complete) {
+    g_serial->print("ASSEMBLER: packet complete len=");
+    g_serial->println(result.packet_length);
+  }
+}
+
 class ServerCallbacks : public BLEServerCallbacks {
  public:
   void onConnect(BLEServer* server) override {
@@ -116,6 +150,12 @@ class RxCallbacks : public BLECharacteristicCallbacks {
     }
 
     logHexPreview(g_rx_buffer, g_rx_length);
+    const packet_assembler::FeedResult assembler_result =
+        packet_assembler::pushFragment(g_rx_buffer, g_rx_length);
+    logAssemblerResult(assembler_result);
+    if (packet_assembler::hasCompletePacket()) {
+      packet_assembler::consumePacket();
+    }
     sendAck();
   }
 };
@@ -130,6 +170,7 @@ namespace ble_transport {
 bool begin(Stream& serial) {
   g_serial = &serial;
   g_ready = false;
+  packet_assembler::reset();
 
   serial.println("BLE: init start");
 
