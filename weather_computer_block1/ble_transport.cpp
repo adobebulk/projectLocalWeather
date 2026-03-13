@@ -13,7 +13,6 @@
 namespace {
 
 constexpr char kDeviceName[] = "WeatherComputer";
-constexpr char kAckPayload[] = "ACK";
 constexpr size_t kRxBufferSize = 128;
 constexpr size_t kHexPreviewBytes = 16;
 
@@ -28,6 +27,7 @@ Stream* g_serial = nullptr;
 bool g_ready = false;
 bool g_device_connected = false;
 bool g_restart_advertising = false;
+uint8_t g_ack_payload[3] = {'A', 'C', 'K'};
 uint8_t g_rx_buffer[kRxBufferSize];
 size_t g_rx_length = 0;
 
@@ -65,7 +65,7 @@ void sendAck() {
     return;
   }
 
-  g_tx_characteristic->setValue(reinterpret_cast<const uint8_t*>(kAckPayload), 3);
+  g_tx_characteristic->setValue(g_ack_payload, 3);
 
   if (g_device_connected) {
     g_tx_characteristic->notify();
@@ -162,7 +162,7 @@ bool begin(Stream& serial) {
 
   g_rx_characteristic->setCallbacks(&g_rx_callbacks);
   g_tx_characteristic->addDescriptor(new BLE2902());
-  g_tx_characteristic->setValue(reinterpret_cast<const uint8_t*>(kAckPayload), 3);
+  g_tx_characteristic->setValue(g_ack_payload, 3);
 
   service->start();
   BLEAdvertising* advertising = BLEDevice::getAdvertising();
