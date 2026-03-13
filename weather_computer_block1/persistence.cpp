@@ -68,18 +68,36 @@ bool validateRecord(const PersistRecord<Payload>& record) {
   return expected_crc == record.header.payload_crc32;
 }
 
-bool validateStoredWeather(const protocol_parser::RegionalSnapshotV1& weather) {
-  return weather.header.magic == protocol_parser::kMagic &&
-         weather.header.version == protocol_parser::kVersion &&
-         weather.header.packet_type == protocol_parser::kPacketTypeRegionalSnapshotV1 &&
-         weather.header.total_length == protocol_parser::kRegionalSnapshotPacketSize;
+static_assert(sizeof(protocol_parser::RegionalSnapshotV1) ==
+                  protocol_parser::kRegionalSnapshotPacketSize,
+              "RegionalSnapshotV1 must remain byte-identical to protocol packet size");
+static_assert(sizeof(protocol_parser::PositionUpdateV1) ==
+                  protocol_parser::kPositionUpdatePacketSize,
+              "PositionUpdateV1 must remain byte-identical to protocol packet size");
+
+const char* parseStatusLabel(protocol_parser::ParseStatus status) {
+  if (status == protocol_parser::kParseBadMagic) {
+    return "bad magic";
+  }
+  if (status == protocol_parser::kParseBadVersion) {
+    return "bad version";
+  }
+  if (status == protocol_parser::kParseBadLength) {
+    return "bad length";
+  }
+  if (status == protocol_parser::kParseBadCrc) {
+    return "bad crc";
+  }
+  if (status == protocol_parser::kParseUnknownPacketType) {
+    return "unknown packet type";
+  }
+  return "parse failure";
 }
 
-bool validateStoredPosition(const protocol_parser::PositionUpdateV1& position) {
-  return position.header.magic == protocol_parser::kMagic &&
-         position.header.version == protocol_parser::kVersion &&
-         position.header.packet_type == protocol_parser::kPacketTypePositionUpdateV1 &&
-         position.header.total_length == protocol_parser::kPositionUpdatePacketSize;
+template <typename Payload>
+protocol_parser::ParseResult parseStoredPayload(const Payload& payload) {
+  return protocol_parser::parsePacket(reinterpret_cast<const uint8_t*>(&payload),
+                                      sizeof(Payload));
 }
 
 template <typename Payload>
@@ -146,7 +164,8 @@ bool saveWithTwoSlots(const char* key0, const char* key1, const Payload& payload
 }
 
 template <typename Payload>
-bool restoreWithTwoSlots(const char* key0, const char* key1, Payload* out_payload) {
+bool restoreWithTwoSlots(const char* key0, const char* key1, Payload* out_payload,
+                         const char* record_name, Stream& serial) {
   Preferences preferences;
   if (!preferences.begin(kNamespace, true)) {
     return false;
@@ -162,7 +181,37 @@ bool restoreWithTwoSlots(const char* key0, const char* key1, Payload* out_payloa
     return false;
   }
 
-  if (slot0_valid && (!slot1_valid || slot0.header.generation >= slot1.header.generation)) {
+  bool slot0_protocol_valid = false;
+  bool slot1_protocol_valid = false;
+
+  if (slot0_valid) {
+    const protocol_parser::ParseResult parsed = parseStoredPayload(slot0.payload);
+    slot0_protocol_valid = parsed.status == protocol_parser::kParseOk;
+    if (!slot0_protocol_valid) {
+      serial.print("PERSIST: ");
+      serial.print(record_name);
+      serial.print(" slot 0 validation failed: ");
+      serial.println(parseStatusLabel(parsed.status));
+    }
+  }
+
+  if (slot1_valid) {
+    const protocol_parser::ParseResult parsed = parseStoredPayload(slot1.payload);
+    slot1_protocol_valid = parsed.status == protocol_parser::kParseOk;
+    if (!slot1_protocol_valid) {
+      serial.print("PERSIST: ");
+      serial.print(record_name);
+      serial.print(" slot 1 validation failed: ");
+      serial.println(parseStatusLabel(parsed.status));
+    }
+  }
+
+  if (!slot0_protocol_valid && !slot1_protocol_valid) {
+    return false;
+  }
+
+  if (slot0_protocol_valid &&
+      (!slot1_protocol_valid || slot0.header.generation >= slot1.header.generation)) {
     *out_payload = slot0.payload;
     return true;
   }
@@ -234,8 +283,8 @@ void restoreDeviceState(Stream& serial) {
   device_state::DeviceState* state = device_state::mutableState();
 
   protocol_parser::RegionalSnapshotV1 restored_weather = {};
-  if (restoreWithTwoSlots(kWeatherSlot0Key, kWeatherSlot1Key, &restored_weather) &&
-      validateStoredWeather(restored_weather)) {
+  if (restoreWithTwoSlots(kWeatherSlot0Key, kWeatherSlot1Key, &restored_weather, "weather",
+                          serial)) {
     state->weather = restored_weather;
     state->weather_timestamp = restored_weather.header.timestamp_unix;
     state->has_weather = true;
@@ -246,8 +295,8 @@ void restoreDeviceState(Stream& serial) {
   }
 
   protocol_parser::PositionUpdateV1 restored_position = {};
-  if (restoreWithTwoSlots(kPositionSlot0Key, kPositionSlot1Key, &restored_position) &&
-      validateStoredPosition(restored_position)) {
+  if (restoreWithTwoSlots(kPositionSlot0Key, kPositionSlot1Key, &restored_position, "position",
+                          serial)) {
     state->position = restored_position;
     state->position_timestamp = restored_position.header.timestamp_unix;
     state->has_position = true;
