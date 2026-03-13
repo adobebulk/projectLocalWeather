@@ -7,9 +7,25 @@ namespace {
 
 constexpr uint8_t kMagicFirstByte = 0x43;
 constexpr uint8_t kMagicSecondByte = 0x57;
+constexpr uint8_t kSupportedVersion = 1;
+constexpr uint8_t kPacketTypeRegionalSnapshotV1 = 1;
+constexpr uint8_t kPacketTypePositionUpdateV1 = 2;
+constexpr uint8_t kPacketTypeAckV1 = 3;
+
+constexpr size_t kMagicOffset = 0;
+constexpr size_t kVersionOffset = 2;
+constexpr size_t kPacketTypeOffset = 3;
 constexpr size_t kLengthFieldOffset = 4;
 constexpr size_t kLengthFieldSize = 2;
-constexpr size_t kMinimumHeaderSize = 10;
+constexpr size_t kSequenceOffset = 6;
+constexpr size_t kTimestampOffset = 10;
+constexpr size_t kCrcOffset = 14;
+constexpr size_t kCrcSize = 4;
+constexpr size_t kHeaderSize = 18;
+
+constexpr size_t kPositionPacketSize = 32;
+constexpr size_t kAckPacketSize = 32;
+constexpr size_t kRegionalSnapshotPacketSize = 470;
 constexpr size_t kMaxPacketLength = 512;
 constexpr size_t kAssemblerBufferSize = 768;
 
@@ -23,6 +39,22 @@ bool g_has_complete_packet = false;
 size_t readExpectedPacketLength() {
   return static_cast<size_t>(g_buffer[kLengthFieldOffset]) |
          (static_cast<size_t>(g_buffer[kLengthFieldOffset + 1]) << 8);
+}
+
+size_t expectedLengthForPacketType(uint8_t packet_type) {
+  if (packet_type == kPacketTypeRegionalSnapshotV1) {
+    return kRegionalSnapshotPacketSize;
+  }
+
+  if (packet_type == kPacketTypePositionUpdateV1) {
+    return kPositionPacketSize;
+  }
+
+  if (packet_type == kPacketTypeAckV1) {
+    return kAckPacketSize;
+  }
+
+  return 0;
 }
 
 size_t findMagicOffset() {
@@ -106,15 +138,36 @@ FeedResult pushFragment(const uint8_t* data, size_t length) {
       continue;
     }
 
-    if (g_buffer_length < kLengthFieldOffset + kLengthFieldSize) {
+    if (g_buffer_length < kHeaderSize) {
       break;
     }
 
+    const uint8_t version = g_buffer[kVersionOffset];
+    const uint8_t packet_type = g_buffer[kPacketTypeOffset];
     const size_t expected_length = readExpectedPacketLength();
     result.expected_length_known = true;
     result.expected_packet_length = expected_length;
 
-    if (expected_length < kMinimumHeaderSize || expected_length > kMaxPacketLength) {
+    if (version != kSupportedVersion) {
+      result.malformed_start = true;
+      dropBytes(1);
+      continue;
+    }
+
+    const size_t fixed_packet_length = expectedLengthForPacketType(packet_type);
+    if (fixed_packet_length == 0) {
+      result.malformed_start = true;
+      dropBytes(1);
+      continue;
+    }
+
+    if (expected_length != fixed_packet_length) {
+      result.malformed_start = true;
+      dropBytes(1);
+      continue;
+    }
+
+    if (expected_length < kHeaderSize || expected_length > kMaxPacketLength) {
       result.malformed_start = true;
       dropBytes(1);
       continue;
