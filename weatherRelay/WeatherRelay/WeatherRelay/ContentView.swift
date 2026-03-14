@@ -45,57 +45,66 @@ struct ContentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Weather Relay")
-                .font(.title2)
-                .fontWeight(.semibold)
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 16) {
+                    Text("Weather Relay")
+                        .font(.title2)
+                        .fontWeight(.semibold)
 
-            Text(bleManager.statusText)
-                .font(.headline)
+                    Text(bleManager.statusText)
+                        .font(.headline)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Scan state: \(bleManager.isScanning ? "Scanning" : "Not scanning")")
-                Text("Last peripheral name: \(bleManager.lastDiscoveredPeripheralName)")
-                Text("Last advertised name: \(bleManager.lastAdvertisedLocalName)")
-                Text("Found target: \(bleManager.didFindDevice ? "Yes" : "No")")
-                Text("Last sent packet: \(bleManager.lastSentPacketHex)")
-                Text("ACK status: \(bleManager.lastAck.map { $0.status.description } ?? "-")")
-                Text("ACK echoed sequence: \(bleManager.lastAck.map { String($0.sequence) } ?? "-")")
-                Text("ACK weather timestamp: \(bleManager.lastAck.map { String($0.weatherTimestamp) } ?? "-")")
-                Text("ACK position timestamp: \(bleManager.lastAck.map { String($0.positionTimestamp) } ?? "-")")
-                Text("Location status: \(locationManager.statusText)")
-                Text("Latitude: \(latitudeText)")
-                Text("Longitude: \(longitudeText)")
-                Text("Accuracy: \(accuracyText)")
-                Text("Location timestamp: \(locationTimestampText)")
-            }
-            .font(.subheadline)
-            .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Scan state: \(bleManager.isScanning ? "Scanning" : "Not scanning")")
+                        Text("Last peripheral name: \(bleManager.lastDiscoveredPeripheralName)")
+                        Text("Last advertised name: \(bleManager.lastAdvertisedLocalName)")
+                        Text("Found target: \(bleManager.didFindDevice ? "Yes" : "No")")
+                        Text("Last sent packet: \(bleManager.lastSentPacketHex)")
+                        Text("ACK status: \(bleManager.lastAck.map { $0.status.description } ?? "-")")
+                        Text("ACK echoed sequence: \(bleManager.lastAck.map { String($0.sequence) } ?? "-")")
+                        Text("ACK weather timestamp: \(bleManager.lastAck.map { String($0.weatherTimestamp) } ?? "-")")
+                        Text("ACK position timestamp: \(bleManager.lastAck.map { String($0.positionTimestamp) } ?? "-")")
+                        Text("Location status: \(locationManager.statusText)")
+                        Text("Latitude: \(latitudeText)")
+                        Text("Longitude: \(longitudeText)")
+                        Text("Accuracy: \(accuracyText)")
+                        Text("Location timestamp: \(locationTimestampText)")
+                    }
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-            if bleManager.didDiscoverService {
-                Text("Service discovered")
-                    .foregroundStyle(.secondary)
-            }
+                    if bleManager.didDiscoverService {
+                        Text("Service discovered")
+                            .foregroundStyle(.secondary)
+                    }
 
-            if bleManager.didDiscoverCharacteristics {
-                Text("RX/TX characteristics discovered")
-                    .foregroundStyle(.secondary)
-            }
+                    if bleManager.didDiscoverCharacteristics {
+                        Text("RX/TX characteristics discovered")
+                            .foregroundStyle(.secondary)
+                    }
 
-            Button("Send Position Packet") {
-                bleManager.sendPositionPacket(locationFix: locationManager.currentFix)
-            }
-            .buttonStyle(.bordered)
-            .disabled(!bleManager.didDiscoverCharacteristics || !locationManager.hasValidLocation)
+                    Button("Send Position Packet") {
+                        bleManager.sendPositionPacket(locationFix: locationManager.currentFix)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!bleManager.didDiscoverCharacteristics || !locationManager.hasValidLocation)
 
-            if locationManager.canRequestAlwaysAuthorization {
-                Button("Enable Background Location") {
-                    locationManager.requestAlwaysAuthorizationIfPossible()
+                    NavigationLink("Weather Debug") {
+                        WeatherDebugView(locationManager: locationManager)
+                    }
+                    .buttonStyle(.bordered)
+
+                    if locationManager.canRequestAlwaysAuthorization {
+                        Button("Enable Background Location") {
+                            locationManager.requestAlwaysAuthorizationIfPossible()
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
+                .padding()
             }
         }
-        .padding()
         .onAppear {
             print("ContentView: appeared scenePhase=\(scenePhase.description)")
         }

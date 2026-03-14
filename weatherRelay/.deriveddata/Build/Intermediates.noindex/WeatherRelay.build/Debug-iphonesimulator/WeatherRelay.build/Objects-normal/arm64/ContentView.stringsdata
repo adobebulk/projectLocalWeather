@@ -6,152 +6,160 @@
         "comment": "",
         "key": "Weather Relay",
         "location": {
-          "startingColumn": 18,
-          "startingLine": 49
+          "startingColumn": 26,
+          "startingLine": 51
         }
       },
       {
         "comment": "",
         "key": "Service discovered",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 76
+          "startingColumn": 30,
+          "startingLine": 78
         }
       },
       {
         "comment": "",
         "key": "RX/TX characteristics discovered",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 81
+          "startingColumn": 30,
+          "startingLine": 83
         }
       },
       {
         "comment": "",
         "key": "Send Position Packet",
         "location": {
-          "startingColumn": 20,
-          "startingLine": 85
+          "startingColumn": 28,
+          "startingLine": 87
+        }
+      },
+      {
+        "comment": "",
+        "key": "Weather Debug",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 93
         }
       },
       {
         "comment": "",
         "key": "Enable Background Location",
         "location": {
-          "startingColumn": 24,
-          "startingLine": 92
+          "startingColumn": 32,
+          "startingLine": 99
         }
       },
       {
         "comment": "",
         "key": "Scan state: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 57
+          "startingColumn": 30,
+          "startingLine": 59
         }
       },
       {
         "comment": "",
         "key": "Last peripheral name: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 58
+          "startingColumn": 30,
+          "startingLine": 60
         }
       },
       {
         "comment": "",
         "key": "Last advertised name: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 59
+          "startingColumn": 30,
+          "startingLine": 61
         }
       },
       {
         "comment": "",
         "key": "Found target: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 60
+          "startingColumn": 30,
+          "startingLine": 62
         }
       },
       {
         "comment": "",
         "key": "Last sent packet: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 61
+          "startingColumn": 30,
+          "startingLine": 63
         }
       },
       {
         "comment": "",
         "key": "ACK status: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 62
+          "startingColumn": 30,
+          "startingLine": 64
         }
       },
       {
         "comment": "",
         "key": "ACK echoed sequence: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 63
+          "startingColumn": 30,
+          "startingLine": 65
         }
       },
       {
         "comment": "",
         "key": "ACK weather timestamp: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 64
+          "startingColumn": 30,
+          "startingLine": 66
         }
       },
       {
         "comment": "",
         "key": "ACK position timestamp: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 65
+          "startingColumn": 30,
+          "startingLine": 67
         }
       },
       {
         "comment": "",
         "key": "Location status: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 66
+          "startingColumn": 30,
+          "startingLine": 68
         }
       },
       {
         "comment": "",
         "key": "Latitude: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 67
+          "startingColumn": 30,
+          "startingLine": 69
         }
       },
       {
         "comment": "",
         "key": "Longitude: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 68
+          "startingColumn": 30,
+          "startingLine": 70
         }
       },
       {
         "comment": "",
         "key": "Accuracy: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 69
+          "startingColumn": 30,
+          "startingLine": 71
         }
       },
       {
         "comment": "",
         "key": "Location timestamp: %@",
         "location": {
-          "startingColumn": 22,
-          "startingLine": 70
+          "startingColumn": 30,
+          "startingLine": 72
         }
       }
     ]
