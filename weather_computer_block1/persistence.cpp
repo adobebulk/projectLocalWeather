@@ -116,7 +116,7 @@ bool readSlot(Preferences* preferences, const char* key, PersistRecord<Payload>*
 
 template <typename Payload>
 bool writeRecord(Preferences* preferences, const char* key, uint32_t generation,
-                 const Payload& payload) {
+                 const Payload& payload, const char* record_name, Stream& serial) {
   PersistRecord<Payload> record = {};
   record.header.magic = kRecordMagic;
   record.header.record_version = kRecordVersion;
@@ -126,13 +126,29 @@ bool writeRecord(Preferences* preferences, const char* key, uint32_t generation,
   record.header.payload_crc32 = computePayloadCrc32(
       reinterpret_cast<const uint8_t*>(&record.payload), sizeof(Payload));
 
+  serial.print("PERSIST: ");
+  serial.print(record_name);
+  serial.print(" write start key=");
+  serial.print(key);
+  serial.print(" gen=");
+  serial.print(generation);
+  serial.print(" bytes=");
+  serial.println(sizeof(record));
+
   return preferences->putBytes(key, &record, sizeof(record)) == sizeof(record);
 }
 
 template <typename Payload>
-bool saveWithTwoSlots(const char* key0, const char* key1, const Payload& payload) {
+bool saveWithTwoSlots(const char* key0, const char* key1, const Payload& payload,
+                      const char* record_name, Stream& serial) {
   Preferences preferences;
+  serial.print("PERSIST: ");
+  serial.print(record_name);
+  serial.println(" save start");
   if (!preferences.begin(kNamespace, false)) {
+    serial.print("PERSIST: ");
+    serial.print(record_name);
+    serial.println(" NVS open failure");
     return false;
   }
 
@@ -158,8 +174,12 @@ bool saveWithTwoSlots(const char* key0, const char* key1, const Payload& payload
     target_key = key0;
   }
 
-  const bool success = writeRecord(&preferences, target_key, next_generation, payload);
+  const bool success =
+      writeRecord(&preferences, target_key, next_generation, payload, record_name, serial);
   preferences.end();
+  serial.print("PERSIST: ");
+  serial.print(record_name);
+  serial.println(" save end");
   return success;
 }
 
@@ -260,7 +280,7 @@ bool corruptSlot(const char* key) {
 namespace persistence {
 
 bool saveWeatherSnapshot(const protocol_parser::RegionalSnapshotV1& weather, Stream& serial) {
-  if (!saveWithTwoSlots(kWeatherSlot0Key, kWeatherSlot1Key, weather)) {
+  if (!saveWithTwoSlots(kWeatherSlot0Key, kWeatherSlot1Key, weather, "weather", serial)) {
     serial.println("PERSIST: weather save failure");
     return false;
   }
@@ -270,7 +290,7 @@ bool saveWeatherSnapshot(const protocol_parser::RegionalSnapshotV1& weather, Str
 }
 
 bool savePositionUpdate(const protocol_parser::PositionUpdateV1& position, Stream& serial) {
-  if (!saveWithTwoSlots(kPositionSlot0Key, kPositionSlot1Key, position)) {
+  if (!saveWithTwoSlots(kPositionSlot0Key, kPositionSlot1Key, position, "position", serial)) {
     serial.println("PERSIST: position save failure");
     return false;
   }

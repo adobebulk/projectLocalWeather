@@ -90,7 +90,9 @@ void handlePacket(const protocol_parser::ParseResult& result, Stream& serial) {
     state->position_timestamp = result.position.header.timestamp_unix;
     state->has_position = true;
     serial.println("INGRESS: stored position update");
+    serial.println("INGRESS: position persist start");
     persistence::savePositionUpdate(state->position, serial);
+    serial.println("INGRESS: position persist complete");
     recomputeEstimate(state, serial);
     return;
   }
@@ -100,7 +102,9 @@ void handlePacket(const protocol_parser::ParseResult& result, Stream& serial) {
     state->weather_timestamp = result.regional_snapshot.header.timestamp_unix;
     state->has_weather = true;
     serial.println("INGRESS: stored weather snapshot");
+    serial.println("INGRESS: weather persist start");
     persistence::saveWeatherSnapshot(state->weather, serial);
+    serial.println("INGRESS: weather persist complete");
     recomputeEstimate(state, serial);
     return;
   }

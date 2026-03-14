@@ -27,7 +27,7 @@ enum ParseStatus {
   kParseUnknownPacketType,
 };
 
-struct PacketHeader {
+struct __attribute__((packed)) PacketHeader {
   uint16_t magic;
   uint8_t version;
   uint8_t packet_type;
@@ -37,7 +37,7 @@ struct PacketHeader {
   uint32_t checksum_crc32;
 };
 
-struct PositionUpdateV1 {
+struct __attribute__((packed)) PositionUpdateV1 {
   PacketHeader header;
   int32_t lat_e5;
   int32_t lon_e5;
@@ -45,7 +45,7 @@ struct PositionUpdateV1 {
   uint32_t fix_timestamp_unix;
 };
 
-struct AckV1 {
+struct __attribute__((packed)) AckV1 {
   PacketHeader header;
   uint32_t echoed_sequence;
   uint8_t status_code;
@@ -54,7 +54,7 @@ struct AckV1 {
   uint8_t reserved;
 };
 
-struct RegionalSnapshotMetadataV1 {
+struct __attribute__((packed)) RegionalSnapshotMetadataV1 {
   int32_t field_center_lat_e5;
   int32_t field_center_lon_e5;
   uint16_t field_width_mi;
@@ -67,7 +67,7 @@ struct RegionalSnapshotMetadataV1 {
   uint16_t source_age_min;
 };
 
-struct WeatherSlot {
+struct __attribute__((packed)) WeatherSlot {
   uint16_t slot_offset_min;
   int16_t air_temp_c_tenths;
   uint16_t wind_speed_mps_tenths;
@@ -80,7 +80,7 @@ struct WeatherSlot {
   uint16_t hazard_flags;
 };
 
-struct RegionalSnapshotV1 {
+struct __attribute__((packed)) RegionalSnapshotV1 {
   PacketHeader header;
   RegionalSnapshotMetadataV1 metadata;
   WeatherSlot anchor_slots[kAnchorCount][kSlotCount];
@@ -96,6 +96,16 @@ struct ParseResult {
 
 ParseResult parsePacket(const uint8_t* packet, size_t length);
 const char* statusToLogMessage(ParseStatus status, uint8_t packet_type);
+
+static_assert(sizeof(PacketHeader) == kHeaderSize, "PacketHeader size must match protocol");
+static_assert(sizeof(PositionUpdateV1) == kPositionUpdatePacketSize,
+              "PositionUpdateV1 size must match protocol");
+static_assert(sizeof(AckV1) == kAckPacketSize, "AckV1 size must match protocol");
+static_assert(sizeof(RegionalSnapshotMetadataV1) == 20,
+              "RegionalSnapshotMetadataV1 size must match protocol");
+static_assert(sizeof(WeatherSlot) == 16, "WeatherSlot size must match protocol");
+static_assert(sizeof(RegionalSnapshotV1) == kRegionalSnapshotPacketSize,
+              "RegionalSnapshotV1 size must match protocol");
 
 }  // namespace protocol_parser
 
