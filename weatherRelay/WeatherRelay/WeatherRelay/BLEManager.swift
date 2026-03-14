@@ -66,6 +66,8 @@ final class BLEManager: NSObject, ObservableObject {
     private var pendingWeatherChunkWriteType: CBCharacteristicWriteType?
     private var pendingWeatherChunkIndex = 0
     private var pendingWeatherChunkTotal = 0
+    private var restoredPeripheralPendingPoweredOn: CBPeripheral?
+    private var restoredPeripheralWasConnected = false
 
     private let positionSendInterval: TimeInterval = 10 * 60
     private let autoSendMaximumFixAge: TimeInterval = 60
@@ -168,6 +170,8 @@ final class BLEManager: NSObject, ObservableObject {
         pendingWeatherChunkWriteType = nil
         pendingWeatherChunkIndex = 0
         pendingWeatherChunkTotal = 0
+        restoredPeripheralPendingPoweredOn = nil
+        restoredPeripheralWasConnected = false
     }
 
     func sendPositionPacket(locationFix: LocationManager.LocationFix?) {
@@ -388,6 +392,38 @@ final class BLEManager: NSObject, ObservableObject {
         print("BLEManager: sending RegionalSnapshotV1 chunk \(pendingWeatherChunkIndex)/\(pendingWeatherChunkTotal) bytes=\(chunk.count)")
         peripheral.writeValue(chunk, for: rxCharacteristic, type: writeType)
     }
+
+    private func resumeRestoredPeripheralIfNeeded() {
+        guard bluetoothPoweredOn else {
+            return
+        }
+
+        guard let restoredPeripheral = restoredPeripheralPendingPoweredOn else {
+            return
+        }
+
+        restoredPeripheralPendingPoweredOn = nil
+
+        guard restoredPeripheralWasConnected else {
+            print("BLEManager: poweredOn reached, restored peripheral was not connected - waiting for normal reconnect path")
+            restoredPeripheralWasConnected = false
+            return
+        }
+
+        restoredPeripheralWasConnected = false
+        targetPeripheral = restoredPeripheral
+        restoredPeripheral.delegate = self
+        isConnected = true
+        print(
+            """
+            BLEManager: poweredOn reached, resuming restored peripheral flow \
+            name=\(restoredPeripheral.name ?? "nil") \
+            id=\(restoredPeripheral.identifier)
+            """
+        )
+        print("BLEManager: restored connected peripheral, rediscovering services after poweredOn")
+        restoredPeripheral.discoverServices([Self.serviceUUID])
+    }
 }
 
 extension BLEManager: CBCentralManagerDelegate {
@@ -406,6 +442,8 @@ extension BLEManager: CBCentralManagerDelegate {
         if let restoredPeripheral = restoredPeripherals.first(where: {
             $0.name == Self.targetPeripheralName || $0.identifier == targetPeripheral?.identifier
         }) ?? restoredPeripherals.first {
+            restoredPeripheralPendingPoweredOn = restoredPeripheral
+            restoredPeripheralWasConnected = restoredPeripheral.state == .connected
             targetPeripheral = restoredPeripheral
             restoredPeripheral.delegate = self
             print(
@@ -416,14 +454,12 @@ extension BLEManager: CBCentralManagerDelegate {
                 state=\(restoredPeripheral.state.description)
                 """
             )
-
-            if restoredPeripheral.state == .connected {
-                isConnected = true
-                print("BLEManager: restored connected peripheral, rediscovering services")
-                restoredPeripheral.discoverServices([Self.serviceUUID])
-            } else {
-                print("BLEManager: restored peripheral not connected, waiting for reconnect path")
-            }
+            print(
+                """
+                BLEManager: restored peripheral stored pending poweredOn \
+                wasConnected=\(restoredPeripheralWasConnected)
+                """
+            )
         } else {
             print("BLEManager: willRestoreState found no peripheral to restore")
         }
@@ -435,6 +471,7 @@ extension BLEManager: CBCentralManagerDelegate {
 
         switch central.state {
         case .poweredOn:
+            resumeRestoredPeripheralIfNeeded()
             startScanningIfNeeded()
         case .poweredOff, .resetting, .unauthorized, .unsupported, .unknown:
             isScanning = false
