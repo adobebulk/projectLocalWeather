@@ -6,7 +6,6 @@
 //
 
 import Combine
-import CoreLocation
 import CoreBluetooth
 import Foundation
 
@@ -60,11 +59,9 @@ final class BLEManager: NSObject, ObservableObject {
     private var txCharacteristic: CBCharacteristic?
     private var nextSequenceNumber: UInt32 = 202
     private var lastPositionSendDate: Date?
-    private var lastSentLocationFix: LocationManager.LocationFix?
 
-    private let autoSendMinimumInterval: TimeInterval = 5 * 60
+    private let autoSendInterval: TimeInterval = 10 * 60
     private let autoSendMaximumFixAge: TimeInterval = 60
-    private let autoSendMaterialDistanceMeters: CLLocationDistance = 100
 
     override init() {
         super.init()
@@ -111,71 +108,78 @@ final class BLEManager: NSObject, ObservableObject {
         rxCharacteristic = nil
         txCharacteristic = nil
         lastPositionSendDate = nil
-        lastSentLocationFix = nil
     }
 
     func sendPositionPacket(locationFix: LocationManager.LocationFix?) {
         sendPositionPacket(locationFix: locationFix, trigger: "manual")
     }
 
-    func considerAutoSend(locationFix: LocationManager.LocationFix?, trigger: String) {
+    func considerInitialAutoSend(locationFix: LocationManager.LocationFix?, trigger: String) {
         guard isConnected && didDiscoverCharacteristics else {
-            print("BLEManager: auto-send skipped - BLE not ready trigger=\(trigger)")
+            print("BLEManager: initial auto-send skipped - BLE not ready trigger=\(trigger)")
             return
         }
 
         guard let locationFix else {
-            print("BLEManager: auto-send skipped - no live location trigger=\(trigger)")
+            print("BLEManager: initial auto-send skipped - no live location trigger=\(trigger)")
             return
         }
 
         guard locationFix.horizontalAccuracy >= 0 else {
-            print("BLEManager: auto-send skipped - invalid accuracy trigger=\(trigger)")
+            print("BLEManager: initial auto-send skipped - invalid accuracy trigger=\(trigger)")
             return
         }
 
         let fixAge = Date().timeIntervalSince(locationFix.timestamp)
         guard fixAge <= autoSendMaximumFixAge else {
-            print("BLEManager: auto-send skipped - stale fix ageSeconds=\(Int(fixAge)) trigger=\(trigger)")
+            print("BLEManager: initial auto-send skipped - stale fix ageSeconds=\(Int(fixAge)) trigger=\(trigger)")
             return
         }
 
-        if lastPositionSendDate == nil {
-            print("BLEManager: auto-send allowed - first eligible fix trigger=\(trigger)")
-            sendPositionPacket(locationFix: locationFix, trigger: "auto/\(trigger)")
+        guard lastPositionSendDate == nil else {
+            print("BLEManager: initial auto-send skipped - already sent initial position trigger=\(trigger)")
             return
         }
 
-        let secondsSinceLastSend = Date().timeIntervalSince(lastPositionSendDate ?? .distantPast)
-        if secondsSinceLastSend >= autoSendMinimumInterval {
-            print("BLEManager: auto-send allowed - interval elapsed seconds=\(Int(secondsSinceLastSend)) trigger=\(trigger)")
-            sendPositionPacket(locationFix: locationFix, trigger: "auto/\(trigger)")
+        print("BLEManager: initial auto-send allowed trigger=\(trigger)")
+        sendPositionPacket(locationFix: locationFix, trigger: "initial/\(trigger)")
+    }
+
+    func considerPeriodicAutoSend(locationFix: LocationManager.LocationFix?, trigger: String) {
+        guard isConnected && didDiscoverCharacteristics else {
+            print("BLEManager: periodic auto-send skipped - BLE not ready trigger=\(trigger)")
             return
         }
 
-        if let lastSentLocationFix {
-            let previousLocation = CLLocation(latitude: lastSentLocationFix.latitude, longitude: lastSentLocationFix.longitude)
-            let currentLocation = CLLocation(latitude: locationFix.latitude, longitude: locationFix.longitude)
-            let distanceMeters = currentLocation.distance(from: previousLocation)
-
-            if distanceMeters >= autoSendMaterialDistanceMeters {
-                print("BLEManager: auto-send allowed - material move distanceMeters=\(Int(distanceMeters.rounded())) trigger=\(trigger)")
-                sendPositionPacket(locationFix: locationFix, trigger: "auto/\(trigger)")
-                return
-            }
-
-            print(
-                """
-                BLEManager: auto-send skipped - too recent and no material move \
-                secondsSinceLastSend=\(Int(secondsSinceLastSend)) \
-                distanceMeters=\(Int(distanceMeters.rounded())) \
-                trigger=\(trigger)
-                """
-            )
+        guard let locationFix else {
+            print("BLEManager: periodic auto-send skipped - no live location trigger=\(trigger)")
             return
         }
 
-        print("BLEManager: auto-send skipped - missing last sent fix context trigger=\(trigger)")
+        guard locationFix.horizontalAccuracy >= 0 else {
+            print("BLEManager: periodic auto-send skipped - invalid accuracy trigger=\(trigger)")
+            return
+        }
+
+        let fixAge = Date().timeIntervalSince(locationFix.timestamp)
+        guard fixAge <= autoSendMaximumFixAge else {
+            print("BLEManager: periodic auto-send skipped - stale fix ageSeconds=\(Int(fixAge)) trigger=\(trigger)")
+            return
+        }
+
+        guard let lastPositionSendDate else {
+            print("BLEManager: periodic auto-send skipped - waiting for initial send trigger=\(trigger)")
+            return
+        }
+
+        let secondsSinceLastSend = Date().timeIntervalSince(lastPositionSendDate)
+        guard secondsSinceLastSend >= autoSendInterval else {
+            print("BLEManager: periodic auto-send skipped - interval not reached secondsSinceLastSend=\(Int(secondsSinceLastSend)) trigger=\(trigger)")
+            return
+        }
+
+        print("BLEManager: periodic auto-send allowed secondsSinceLastSend=\(Int(secondsSinceLastSend)) trigger=\(trigger)")
+        sendPositionPacket(locationFix: locationFix, trigger: "periodic/\(trigger)")
     }
 
     private func sendPositionPacket(locationFix: LocationManager.LocationFix?, trigger: String) {
@@ -199,7 +203,6 @@ final class BLEManager: NSObject, ObservableObject {
         )
         nextSequenceNumber += 1
         lastPositionSendDate = Date()
-        lastSentLocationFix = locationFix
 
         let packet = PacketBuilder.makePositionUpdateV1(values: values)
         lastSentPacketHex = packet.hexString

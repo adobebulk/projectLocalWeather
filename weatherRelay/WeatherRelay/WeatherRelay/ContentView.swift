@@ -5,11 +5,14 @@
 //  Created by Clayton Smith on 2026-03-13.
 //
 
+import Combine
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var bleManager = BLEManager()
     @StateObject private var locationManager = LocationManager()
+    private let autoSendTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     private var latitudeText: String {
         guard let latitude = locationManager.latestLatitude else {
@@ -89,10 +92,22 @@ struct ContentView: View {
         }
         .padding()
         .onChange(of: bleManager.didDiscoverCharacteristics) { _, _ in
-            bleManager.considerAutoSend(locationFix: locationManager.currentFix, trigger: "ble-ready")
+            bleManager.considerInitialAutoSend(locationFix: locationManager.currentFix, trigger: "ble-ready")
         }
         .onChange(of: locationManager.currentFix?.timestamp) { _, _ in
-            bleManager.considerAutoSend(locationFix: locationManager.currentFix, trigger: "location-update")
+            bleManager.considerInitialAutoSend(locationFix: locationManager.currentFix, trigger: "location-update")
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                bleManager.considerPeriodicAutoSend(locationFix: locationManager.currentFix, trigger: "scene-active")
+            }
+        }
+        .onReceive(autoSendTimer) { _ in
+            guard scenePhase == .active else {
+                return
+            }
+
+            bleManager.considerPeriodicAutoSend(locationFix: locationManager.currentFix, trigger: "timer")
         }
     }
 }
