@@ -28,6 +28,7 @@ void updateRuntimeDisplay(const interpolation::LocalEstimate& estimate, Stream& 
     return;
   }
 
+  display_formatter::logDecision(estimate, serial);
   const display_formatter::DisplayLines lines = display_formatter::formatEstimate(estimate);
   serial.println("DISPLAY: runtime update start");
   serial.print("DISPLAY: line1=");

@@ -22,6 +22,7 @@ struct DisplayLines {
 };
 
 DisplayLines formatEstimate(const interpolation::LocalEstimate& estimate);
+void logDecision(const interpolation::LocalEstimate& estimate, Stream& serial);
 
 }  // namespace display_formatter
 

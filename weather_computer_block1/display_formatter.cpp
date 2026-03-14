@@ -29,7 +29,14 @@ bool hasHazard(uint16_t hazard_flags, uint8_t bit_index) {
   return (hazard_flags & (1U << bit_index)) != 0U;
 }
 
+bool visibilityMissing(uint16_t visibility_m) {
+  return visibility_m == 0;
+}
+
 const char* visibilityCode(uint16_t visibility_m) {
+  if (visibilityMissing(visibility_m)) {
+    return "";
+  }
   if (visibility_m < 1000) {
     return "VL";
   }
@@ -59,9 +66,12 @@ bool phenomenonCode(const interpolation::LocalEstimate& estimate, char* out_code
   const bool icing = estimate.precip_kind == 4 || hasHazard(estimate.hazard_flags, 5);
   const bool snow = estimate.precip_kind == 2;
   const bool rain = estimate.precip_kind == 1;
-  const bool fog = estimate.visibility_m < 1000;
-  const bool smoke = estimate.visibility_m >= 1000 && estimate.visibility_m < 3000;
-  const bool haze = estimate.visibility_m >= 3000 && estimate.visibility_m < 8000;
+  const bool visibility_known = !visibilityMissing(estimate.visibility_m);
+  const bool fog = visibility_known && estimate.visibility_m < 1000;
+  const bool smoke =
+      visibility_known && estimate.visibility_m >= 1000 && estimate.visibility_m < 3000;
+  const bool haze =
+      visibility_known && estimate.visibility_m >= 3000 && estimate.visibility_m < 8000;
   const bool mixed = estimate.precip_kind == 3 || estimate.precip_kind == 5 ||
                      estimate.precip_kind == 6 || estimate.precip_kind == 255;
 
@@ -124,7 +134,7 @@ void buildLine1(const interpolation::LocalEstimate& estimate, char* out_line) {
   char visibility[4];
   char phenomenon[4];
   char wind[16];
-  bool include_visibility = true;
+  bool include_visibility = !visibilityMissing(estimate.visibility_m);
   bool include_phenomenon = phenomenonCode(estimate, phenomenon);
   bool include_gust = true;
 
@@ -186,13 +196,13 @@ const char* interpretationText(const interpolation::LocalEstimate& estimate) {
   if (estimate.precip_kind == 1) {
     return "RAIN";
   }
-  if (estimate.visibility_m < 1000) {
+  if (!visibilityMissing(estimate.visibility_m) && estimate.visibility_m < 1000) {
     return "FOG";
   }
-  if (estimate.visibility_m < 3000) {
+  if (!visibilityMissing(estimate.visibility_m) && estimate.visibility_m < 3000) {
     return "SMOKE";
   }
-  if (estimate.visibility_m < 8000) {
+  if (!visibilityMissing(estimate.visibility_m) && estimate.visibility_m < 8000) {
     return "HAZE";
   }
   if (estimate.precip_kind == 3 || estimate.precip_kind == 5 || estimate.precip_kind == 6 ||
@@ -232,6 +242,29 @@ DisplayLines formatEstimate(const interpolation::LocalEstimate& estimate) {
   buildLine1(estimate, lines.line1);
   buildLine2(estimate, lines.line2);
   return lines;
+}
+
+void logDecision(const interpolation::LocalEstimate& estimate, Stream& serial) {
+  const bool vis_missing = visibilityMissing(estimate.visibility_m);
+  serial.print("DISPLAY: decision visibility_m=");
+  serial.print(estimate.visibility_m);
+  serial.print(" visibility_code=");
+  if (vis_missing) {
+    serial.print("UNK");
+  } else {
+    serial.print(visibilityCode(estimate.visibility_m));
+  }
+  serial.print(" source=");
+  serial.println(vis_missing ? "missing" : "reported");
+
+  char phenomenon[4];
+  const bool has_phenomenon = phenomenonCode(estimate, phenomenon);
+  serial.print("DISPLAY: decision phenomenon=");
+  serial.print(has_phenomenon ? phenomenon : "NONE");
+  serial.print(" precip_kind=");
+  serial.print(estimate.precip_kind);
+  serial.print(" hazard=0x");
+  serial.println(estimate.hazard_flags, HEX);
 }
 
 }  // namespace display_formatter

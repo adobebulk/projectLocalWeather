@@ -348,6 +348,31 @@ NumericSample interpolateSlotNumeric(
   return sample;
 }
 
+bool interpolateVisibility(
+    const protocol_parser::WeatherSlot& lower_slot,
+    const protocol_parser::WeatherSlot& upper_slot,
+    double fraction,
+    double* out_visibility_m) {
+  const bool lower_valid = lower_slot.visibility_m > 0;
+  const bool upper_valid = upper_slot.visibility_m > 0;
+
+  if (lower_valid && upper_valid) {
+    *out_visibility_m = lerp(lower_slot.visibility_m, upper_slot.visibility_m, fraction);
+    return true;
+  }
+  if (lower_valid) {
+    *out_visibility_m = static_cast<double>(lower_slot.visibility_m);
+    return true;
+  }
+  if (upper_valid) {
+    *out_visibility_m = static_cast<double>(upper_slot.visibility_m);
+    return true;
+  }
+
+  *out_visibility_m = 0.0;
+  return false;
+}
+
 void updatePrecipChoice(
     double* best_score,
     uint8_t* best_probability,
@@ -450,6 +475,7 @@ InterpolationStatus estimateLocalConditions(
   double wind_gust = 0.0;
   double precip_probability = 0.0;
   double visibility = 0.0;
+  double visibility_weight = 0.0;
   uint16_t hazard_flags = 0;
   double best_precip_score = -1.0;
   uint8_t best_precip_probability = 0;
@@ -469,7 +495,11 @@ InterpolationStatus estimateLocalConditions(
     wind_speed += interpolated.wind_speed_mps_tenths * blend.weight;
     wind_gust += interpolated.wind_gust_mps_tenths * blend.weight;
     precip_probability += interpolated.precip_prob_pct * blend.weight;
-    visibility += interpolated.visibility_m * blend.weight;
+    double interpolated_visibility = 0.0;
+    if (interpolateVisibility(lower_slot, upper_slot, temporal.fraction, &interpolated_visibility)) {
+      visibility += interpolated_visibility * blend.weight;
+      visibility_weight += blend.weight;
+    }
 
     if (blend.weight > 0.0) {
       hazard_flags |= lower_slot.hazard_flags;
@@ -499,7 +529,12 @@ InterpolationStatus estimateLocalConditions(
   out_estimate->precip_prob_pct = rounded_precip_probability;
   out_estimate->precip_kind = precip_kind;
   out_estimate->precip_intensity = precip_intensity;
-  out_estimate->visibility_m = clampU16(round(visibility));
+  if (visibility_weight > 0.0) {
+    out_estimate->visibility_m = clampU16(round(visibility / visibility_weight));
+  } else {
+    // Visibility value of 0 is treated as missing/unknown by downstream display policy.
+    out_estimate->visibility_m = 0;
+  }
   out_estimate->hazard_flags = hazard_flags;
   out_estimate->confidence_score = calculateConfidence(
       spatial, temporal, weather.metadata.field_width_mi, weather.metadata.field_height_mi,

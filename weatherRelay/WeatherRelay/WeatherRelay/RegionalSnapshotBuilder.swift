@@ -69,6 +69,8 @@ enum RegionalSnapshotBuilder {
     private static let gridCols: UInt8 = 3
     private static let reserved0: UInt8 = 0
     private static let forecastHorizonMin: UInt16 = 120
+    // Block 1 fallback so "missing" visibility is not serialized as literal zero.
+    private static let missingVisibilityFallbackM: UInt16 = 16_093
 
     static func makeRegionalSnapshotV1DebugData(
         field: ThreeByThreeWeatherFieldDebugData,
@@ -630,8 +632,16 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> UInt16 {
         guard let value else {
-            notes.append("visibility missing/offshore -> encoded 0 in packet")
-            return 0
+            notes.append("visibility missing/offshore -> encoded fallback 16093 m in packet (Block 1 provisional unknown-visibility handling)")
+            print(
+                """
+                RegionalSnapshotBuilder: visibility missing fallback \
+                anchor=\(anchorLabel) \
+                offsetMinutes=\(offsetMinutes) \
+                fallbackM=\(missingVisibilityFallbackM)
+                """
+            )
+            return missingVisibilityFallbackM
         }
 
         let raw = Int(Swift.max(0, value).rounded())
