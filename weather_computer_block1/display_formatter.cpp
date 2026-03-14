@@ -226,9 +226,15 @@ const char* interpretationText(const interpolation::LocalEstimate& estimate) {
 void buildLine2(const interpolation::LocalEstimate& estimate, char* out_line) {
   char confidence[8];
   char interpretation[17];
-  snprintf(confidence, sizeof(confidence), "C%u%%",
-           static_cast<unsigned>(estimate.confidence_score));
   snprintf(interpretation, sizeof(interpretation), "%s", interpretationText(estimate));
+
+  uint8_t display_confidence = estimate.confidence_score;
+  if (strcmp(interpretation, "UNKNOWN") == 0 && display_confidence > 79) {
+    // Display-policy guard: unknown top-level interpretation should not
+    // present near-certain confidence.
+    display_confidence = 79;
+  }
+  snprintf(confidence, sizeof(confidence), "C%u%%", static_cast<unsigned>(display_confidence));
 
   const size_t confidence_length = strlen(confidence);
   const size_t max_interpretation_length = 16 - 1 - confidence_length;
@@ -273,6 +279,18 @@ void logDecision(const interpolation::LocalEstimate& estimate, Stream& serial) {
   serial.print(estimate.precip_kind);
   serial.print(" hazard=0x");
   serial.println(estimate.hazard_flags, HEX);
+
+  const char* interpretation = interpretationText(estimate);
+  uint8_t display_confidence = estimate.confidence_score;
+  if (strcmp(interpretation, "UNKNOWN") == 0 && display_confidence > 79) {
+    display_confidence = 79;
+  }
+  serial.print("DISPLAY: decision interpretation=");
+  serial.print(interpretation);
+  serial.print(" confidence_raw=");
+  serial.print(estimate.confidence_score);
+  serial.print(" confidence_shown=");
+  serial.println(display_confidence);
 }
 
 }  // namespace display_formatter
