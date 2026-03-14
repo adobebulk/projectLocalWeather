@@ -81,12 +81,6 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Button("Send Test Payload") {
-                bleManager.sendTestPayload()
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(!bleManager.didDiscoverCharacteristics)
-
             Button("Send Position Packet") {
                 bleManager.sendPositionPacket(locationFix: locationManager.currentFix)
             }
@@ -94,5 +88,11 @@ struct ContentView: View {
             .disabled(!bleManager.didDiscoverCharacteristics || !locationManager.hasValidLocation)
         }
         .padding()
+        .onChange(of: bleManager.didDiscoverCharacteristics) { _, _ in
+            bleManager.considerAutoSend(locationFix: locationManager.currentFix, trigger: "ble-ready")
+        }
+        .onChange(of: locationManager.currentFix?.timestamp) { _, _ in
+            bleManager.considerAutoSend(locationFix: locationManager.currentFix, trigger: "location-update")
+        }
     }
 }

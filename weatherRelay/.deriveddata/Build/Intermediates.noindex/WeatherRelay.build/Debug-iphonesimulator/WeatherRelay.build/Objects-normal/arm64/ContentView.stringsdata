@@ -28,18 +28,10 @@
       },
       {
         "comment": "",
-        "key": "Send Test Payload",
-        "location": {
-          "startingColumn": 20,
-          "startingLine": 84
-        }
-      },
-      {
-        "comment": "",
         "key": "Send Position Packet",
         "location": {
           "startingColumn": 20,
-          "startingLine": 90
+          "startingLine": 84
         }
       },
       {
