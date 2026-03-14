@@ -282,6 +282,7 @@ typedef unsigned int swift_uint4  __attribute__((__ext_vector_type__(4)));
 #pragma clang diagnostic ignored "-Watimport-in-framework-header"
 #endif
 @import CoreBluetooth;
+@import CoreLocation;
 @import Foundation;
 @import ObjectiveC;
 #endif
@@ -331,6 +332,19 @@ SWIFT_CLASS("_TtC12WeatherRelay10BLEManager")
 - (void)peripheral:(CBPeripheral * _Nonnull)peripheral didUpdateNotificationStateForCharacteristic:(CBCharacteristic * _Nonnull)characteristic error:(NSError * _Nullable)error;
 - (void)peripheral:(CBPeripheral * _Nonnull)peripheral didUpdateValueForCharacteristic:(CBCharacteristic * _Nonnull)characteristic error:(NSError * _Nullable)error;
 - (void)peripheral:(CBPeripheral * _Nonnull)peripheral didWriteValueForCharacteristic:(CBCharacteristic * _Nonnull)characteristic error:(NSError * _Nullable)error;
+@end
+
+SWIFT_CLASS("_TtC12WeatherRelay15LocationManager")
+@interface LocationManager : NSObject
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+@class CLLocationManager;
+@class CLLocation;
+@interface LocationManager (SWIFT_EXTENSION(WeatherRelay)) <CLLocationManagerDelegate>
+- (void)locationManagerDidChangeAuthorization:(CLLocationManager * _Nonnull)manager;
+- (void)locationManager:(CLLocationManager * _Nonnull)manager didUpdateLocations:(NSArray<CLLocation *> * _Nonnull)locations;
+- (void)locationManager:(CLLocationManager * _Nonnull)manager didFailWithError:(NSError * _Nonnull)error;
 @end
 
 #endif

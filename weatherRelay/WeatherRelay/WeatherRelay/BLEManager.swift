@@ -110,20 +110,39 @@ final class BLEManager: NSObject, ObservableObject {
         writeToRX(payload, label: "test payload")
     }
 
-    func sendPositionPacket() {
+    func sendPositionPacket(locationFix: LocationManager.LocationFix?) {
+        guard let locationFix else {
+            print("BLEManager: PositionUpdateV1 skipped - no live location available")
+            return
+        }
+
+        let latitudeE5 = Int32((locationFix.latitude * 100_000).rounded())
+        let longitudeE5 = Int32((locationFix.longitude * 100_000).rounded())
+        let accuracyMeters = UInt16(max(0, min(locationFix.horizontalAccuracy.rounded(), Double(UInt16.max))))
+        let fixTimestampUnix = UInt32(max(0, locationFix.timestamp.timeIntervalSince1970.rounded()))
+
         let values = PacketBuilder.PositionValues(
             sequence: nextSequenceNumber,
-            timestampUnix: 1_700_001_800,
-            latE5: 3_405_223,
-            lonE5: -11_824_368,
-            accuracyM: 8,
-            fixTimestampUnix: 1_700_001_800
+            timestampUnix: fixTimestampUnix,
+            latE5: latitudeE5,
+            lonE5: longitudeE5,
+            accuracyM: accuracyMeters,
+            fixTimestampUnix: fixTimestampUnix
         )
         nextSequenceNumber += 1
 
         let packet = PacketBuilder.makePositionUpdateV1(values: values)
         lastSentPacketHex = packet.hexString
-        print("BLEManager: built PositionUpdateV1 packet hex=\(packet.hexString)")
+        print(
+            """
+            BLEManager: built PositionUpdateV1 packet \
+            latE5=\(latitudeE5) \
+            lonE5=\(longitudeE5) \
+            accuracyM=\(accuracyMeters) \
+            fixTimestampUnix=\(fixTimestampUnix) \
+            hex=\(packet.hexString)
+            """
+        )
         writeToRX(packet, label: "PositionUpdateV1 packet")
     }
 

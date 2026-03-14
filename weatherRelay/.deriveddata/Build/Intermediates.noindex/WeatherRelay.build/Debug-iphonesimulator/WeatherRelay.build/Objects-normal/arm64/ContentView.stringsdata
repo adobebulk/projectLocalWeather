@@ -7,7 +7,7 @@
         "key": "Weather Relay",
         "location": {
           "startingColumn": 18,
-          "startingLine": 15
+          "startingLine": 48
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "Service discovered",
         "location": {
           "startingColumn": 22,
-          "startingLine": 37
+          "startingLine": 75
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "RX/TX characteristics discovered",
         "location": {
           "startingColumn": 22,
-          "startingLine": 42
+          "startingLine": 80
         }
       },
       {
@@ -31,7 +31,7 @@
         "key": "Send Test Payload",
         "location": {
           "startingColumn": 20,
-          "startingLine": 46
+          "startingLine": 84
         }
       },
       {
@@ -39,7 +39,7 @@
         "key": "Send Position Packet",
         "location": {
           "startingColumn": 20,
-          "startingLine": 52
+          "startingLine": 90
         }
       },
       {
@@ -47,7 +47,7 @@
         "key": "Scan state: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 23
+          "startingLine": 56
         }
       },
       {
@@ -55,7 +55,7 @@
         "key": "Last peripheral name: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 24
+          "startingLine": 57
         }
       },
       {
@@ -63,7 +63,7 @@
         "key": "Last advertised name: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 25
+          "startingLine": 58
         }
       },
       {
@@ -71,7 +71,7 @@
         "key": "Found target: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 26
+          "startingLine": 59
         }
       },
       {
@@ -79,7 +79,7 @@
         "key": "Last sent packet: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 27
+          "startingLine": 60
         }
       },
       {
@@ -87,7 +87,7 @@
         "key": "ACK status: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 28
+          "startingLine": 61
         }
       },
       {
@@ -95,7 +95,7 @@
         "key": "ACK echoed sequence: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 29
+          "startingLine": 62
         }
       },
       {
@@ -103,7 +103,7 @@
         "key": "ACK weather timestamp: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 30
+          "startingLine": 63
         }
       },
       {
@@ -111,7 +111,47 @@
         "key": "ACK position timestamp: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 31
+          "startingLine": 64
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location status: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 65
+        }
+      },
+      {
+        "comment": "",
+        "key": "Latitude: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "Longitude: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 67
+        }
+      },
+      {
+        "comment": "",
+        "key": "Accuracy: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 68
+        }
+      },
+      {
+        "comment": "",
+        "key": "Location timestamp: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 69
         }
       }
     ]

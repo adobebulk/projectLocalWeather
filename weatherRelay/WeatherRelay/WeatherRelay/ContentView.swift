@@ -9,6 +9,39 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var bleManager = BLEManager()
+    @StateObject private var locationManager = LocationManager()
+
+    private var latitudeText: String {
+        guard let latitude = locationManager.latestLatitude else {
+            return "-"
+        }
+
+        return String(format: "%.5f", latitude)
+    }
+
+    private var longitudeText: String {
+        guard let longitude = locationManager.latestLongitude else {
+            return "-"
+        }
+
+        return String(format: "%.5f", longitude)
+    }
+
+    private var accuracyText: String {
+        guard let accuracy = locationManager.latestHorizontalAccuracy else {
+            return "-"
+        }
+
+        return String(format: "%.1f m", accuracy)
+    }
+
+    private var locationTimestampText: String {
+        guard let timestamp = locationManager.latestTimestamp else {
+            return "-"
+        }
+
+        return String(Int(timestamp.timeIntervalSince1970))
+    }
 
     var body: some View {
         VStack(spacing: 16) {
@@ -29,6 +62,11 @@ struct ContentView: View {
                 Text("ACK echoed sequence: \(bleManager.lastAck.map { String($0.sequence) } ?? "-")")
                 Text("ACK weather timestamp: \(bleManager.lastAck.map { String($0.weatherTimestamp) } ?? "-")")
                 Text("ACK position timestamp: \(bleManager.lastAck.map { String($0.positionTimestamp) } ?? "-")")
+                Text("Location status: \(locationManager.statusText)")
+                Text("Latitude: \(latitudeText)")
+                Text("Longitude: \(longitudeText)")
+                Text("Accuracy: \(accuracyText)")
+                Text("Location timestamp: \(locationTimestampText)")
             }
             .font(.subheadline)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -50,10 +88,10 @@ struct ContentView: View {
             .disabled(!bleManager.didDiscoverCharacteristics)
 
             Button("Send Position Packet") {
-                bleManager.sendPositionPacket()
+                bleManager.sendPositionPacket(locationFix: locationManager.currentFix)
             }
             .buttonStyle(.bordered)
-            .disabled(!bleManager.didDiscoverCharacteristics)
+            .disabled(!bleManager.didDiscoverCharacteristics || !locationManager.hasValidLocation)
         }
         .padding()
     }
