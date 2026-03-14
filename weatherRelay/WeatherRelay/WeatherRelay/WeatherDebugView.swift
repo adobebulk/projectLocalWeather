@@ -43,7 +43,10 @@ struct WeatherDebugView: View {
                 Section("3x3 Field Summary") {
                     Text("Center latitude: \(String(format: "%.5f", fieldData.center.latitude))")
                     Text("Center longitude: \(String(format: "%.5f", fieldData.center.longitude))")
+                    Text("Field anchor unix: \(Int(fieldData.fieldAnchorDate.timeIntervalSince1970))")
+                    Text("Anchor ordering: r0c0 r0c1 r0c2 r1c0 r1c1 r1c2 r2c0 r2c1 r2c2")
                     Text("Anchor spacing meters: \(Int(fieldData.geometrySpacingMeters))")
+                    Text("Anchor spacing miles: \(Int(Block1FieldGeometry.anchorSpacingMiles))")
                     Text("Anchors fetched: \(fieldData.anchorResults.count)")
                 }
 

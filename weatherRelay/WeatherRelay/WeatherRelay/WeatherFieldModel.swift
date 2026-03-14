@@ -8,7 +8,8 @@
 import Foundation
 
 struct Block1FieldGeometry {
-    static let anchorSpacingMeters: Double = 10_000
+    static let anchorSpacingMiles: Double = 120
+    static let anchorSpacingMeters: Double = anchorSpacingMiles * 1_609.344
 }
 
 struct WeatherFieldCenter {
@@ -38,5 +39,6 @@ struct WeatherFieldAnchorResult: Identifiable {
 struct ThreeByThreeWeatherFieldDebugData {
     let center: WeatherFieldCenter
     let geometrySpacingMeters: Double
+    let fieldAnchorDate: Date
     let anchorResults: [WeatherFieldAnchorResult]
 }

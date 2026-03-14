@@ -103,18 +103,26 @@ final class NOAAClient {
     }
 
     func fetchOnePointWeather(latitude: Double, longitude: Double) async throws -> NOAAOnePointWeatherDebugData {
-        try await fetchAnchorWeather(latitude: latitude, longitude: longitude, logPrefix: "NOAAClient")
+        try await fetchAnchorWeather(
+            latitude: latitude,
+            longitude: longitude,
+            fieldAnchorDate: Date(),
+            logPrefix: "NOAAClient"
+        )
     }
 
     func fetchThreeByThreeField(centerLatitude: Double, centerLongitude: Double) async -> ThreeByThreeWeatherFieldDebugData {
         let center = WeatherFieldCenter(latitude: centerLatitude, longitude: centerLongitude)
         let anchors = Self.makeAnchorCoordinates(center: center)
+        let fieldAnchorDate = Date()
 
         print(
             """
             NOAAClient: starting 3x3 field fetch \
             centerLat=\(centerLatitude) \
             centerLon=\(centerLongitude) \
+            fieldAnchorUnix=\(Int(fieldAnchorDate.timeIntervalSince1970)) \
+            anchorSpacingMiles=\(Int(Block1FieldGeometry.anchorSpacingMiles)) \
             anchorSpacingMeters=\(Int(Block1FieldGeometry.anchorSpacingMeters))
             """
         )
@@ -135,6 +143,7 @@ final class NOAAClient {
                         let weatherData = try await fetchAnchorWeather(
                             latitude: anchor.latitude,
                             longitude: anchor.longitude,
+                            fieldAnchorDate: fieldAnchorDate,
                             logPrefix: "NOAAClient[\(label)]"
                         )
                         return WeatherFieldAnchorResult(
@@ -174,6 +183,7 @@ final class NOAAClient {
         return ThreeByThreeWeatherFieldDebugData(
             center: center,
             geometrySpacingMeters: Block1FieldGeometry.anchorSpacingMeters,
+            fieldAnchorDate: fieldAnchorDate,
             anchorResults: anchorResults
         )
     }
@@ -181,6 +191,7 @@ final class NOAAClient {
     private func fetchAnchorWeather(
         latitude: Double,
         longitude: Double,
+        fieldAnchorDate: Date,
         logPrefix: String
     ) async throws -> NOAAOnePointWeatherDebugData {
         let pointsURL = try makePointsURL(latitude: latitude, longitude: longitude)
@@ -221,7 +232,7 @@ final class NOAAClient {
             weatherSummary: rawWeather?.summary,
             hazardSummary: rawHazards?.summary
         )
-        let threeSlotModel = Self.deriveThreeSlotModel(properties: forecastProperties, anchorDate: fetchedAt)
+        let threeSlotModel = Self.deriveThreeSlotModel(properties: forecastProperties, fieldAnchorDate: fieldAnchorDate)
 
         print(
             """
@@ -253,27 +264,32 @@ final class NOAAClient {
     }
 
     private static func makeAnchorCoordinates(center: WeatherFieldCenter) -> [WeatherFieldAnchorCoordinate] {
-        let rowOffsets = [-1, 0, 1]
-        let columnOffsets = [-1, 0, 1]
+        let orderedOffsets: [(row: Int, column: Int, northMultiplier: Double, eastMultiplier: Double)] = [
+            (0, 0, 1, -1),
+            (0, 1, 1, 0),
+            (0, 2, 1, 1),
+            (1, 0, 0, -1),
+            (1, 1, 0, 0),
+            (1, 2, 0, 1),
+            (2, 0, -1, -1),
+            (2, 1, -1, 0),
+            (2, 2, -1, 1)
+        ]
 
-        return rowOffsets.flatMap { rowOffset in
-            columnOffsets.map { columnOffset in
-                let northOffsetMeters = Double(-rowOffset) * Block1FieldGeometry.anchorSpacingMeters
-                let eastOffsetMeters = Double(columnOffset) * Block1FieldGeometry.anchorSpacingMeters
-                let coordinate = offsetCoordinate(
-                    latitude: center.latitude,
-                    longitude: center.longitude,
-                    northMeters: northOffsetMeters,
-                    eastMeters: eastOffsetMeters
-                )
+        return orderedOffsets.map { offset in
+            let coordinate = offsetCoordinate(
+                latitude: center.latitude,
+                longitude: center.longitude,
+                northMeters: offset.northMultiplier * Block1FieldGeometry.anchorSpacingMeters,
+                eastMeters: offset.eastMultiplier * Block1FieldGeometry.anchorSpacingMeters
+            )
 
-                return WeatherFieldAnchorCoordinate(
-                    row: rowOffset + 1,
-                    column: columnOffset + 1,
-                    latitude: coordinate.latitude,
-                    longitude: coordinate.longitude
-                )
-            }
+            return WeatherFieldAnchorCoordinate(
+                row: offset.row,
+                column: offset.column,
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude
+            )
         }
     }
 
@@ -555,9 +571,8 @@ final class NOAAClient {
 
     private static func deriveThreeSlotModel(
         properties: [String: Any],
-        anchorDate: Date
+        fieldAnchorDate: Date
     ) -> OnePointThreeSlotWeatherModel {
-        let normalizedAnchorDate = anchorHourStart(for: anchorDate)
         let slotDurationMinutes = 60
 
         let temperatureSeries = parseQuantitativeSeries(
@@ -588,36 +603,41 @@ final class NOAAClient {
 
         let slotOffsets = [0, 60, 120]
         let slots = slotOffsets.map { offsetMinutes -> OnePointWeatherSlot in
-            let slotStart = normalizedAnchorDate.addingTimeInterval(TimeInterval(offsetMinutes * 60))
+            let slotStart = fieldAnchorDate.addingTimeInterval(TimeInterval(offsetMinutes * 60))
             let slotEnd = slotStart.addingTimeInterval(TimeInterval(slotDurationMinutes * 60))
 
             let temperature = deriveSlotValue(
                 series: temperatureSeries,
                 fieldName: "temperature",
+                aggregation: .overlapWeightedAverage,
                 slotStart: slotStart,
                 slotEnd: slotEnd
             )
             let windSpeed = deriveSlotValue(
                 series: windSpeedSeries,
                 fieldName: "windSpeed",
+                aggregation: .overlapWeightedAverage,
                 slotStart: slotStart,
                 slotEnd: slotEnd
             )
             let windGust = deriveSlotValue(
                 series: windGustSeries,
                 fieldName: "windGust",
+                aggregation: .slotMaximum,
                 slotStart: slotStart,
                 slotEnd: slotEnd
             )
             let precipitation = deriveSlotValue(
                 series: precipitationSeries,
                 fieldName: "probabilityOfPrecipitation",
+                aggregation: .slotMaximum,
                 slotStart: slotStart,
                 slotEnd: slotEnd
             )
             let visibility = deriveSlotValue(
                 series: visibilitySeries,
                 fieldName: "visibility",
+                aggregation: .slotMinimum,
                 slotStart: slotStart,
                 slotEnd: slotEnd
             )
@@ -640,20 +660,16 @@ final class NOAAClient {
         }
 
         return OnePointThreeSlotWeatherModel(
-            anchorDate: normalizedAnchorDate,
+            anchorDate: fieldAnchorDate,
             slotDurationMinutes: slotDurationMinutes,
             slots: slots
         )
     }
 
-    private static func anchorHourStart(for date: Date) -> Date {
-        let components = utcCalendar.dateComponents([.year, .month, .day, .hour], from: date)
-        return utcCalendar.date(from: components) ?? date
-    }
-
     private static func deriveSlotValue(
         series: [NOAAQuantitativeSeriesValue],
         fieldName: String,
+        aggregation: SlotAggregation,
         slotStart: Date,
         slotEnd: Date
     ) -> (value: Double?, note: String) {
@@ -670,16 +686,28 @@ final class NOAAClient {
         }
 
         if !overlappingSeries.isEmpty {
-            let weightedSum = overlappingSeries.reduce(0.0) { partial, item in
-                partial + item.sample.normalizedValue * (item.overlap / slotDuration)
+            let derivedValue: Double
+            let aggregationDescription: String
+            switch aggregation {
+            case .overlapWeightedAverage:
+                derivedValue = overlappingSeries.reduce(0.0) { partial, item in
+                    partial + item.sample.normalizedValue * (item.overlap / slotDuration)
+                }
+                aggregationDescription = "overlap-weighted average"
+            case .slotMaximum:
+                derivedValue = overlappingSeries.map(\.sample.normalizedValue).max() ?? 0
+                aggregationDescription = "slot maximum"
+            case .slotMinimum:
+                derivedValue = overlappingSeries.map(\.sample.normalizedValue).min() ?? 0
+                aggregationDescription = "slot minimum"
             }
             let sourceDescription = overlappingSeries.map {
                 "\($0.sample.validTime) overlapMinutes=\(Int($0.overlap / 60)) value=\(formatDouble($0.sample.normalizedValue))"
             }.joined(separator: "; ")
 
             return (
-                weightedSum,
-                "overlap-weighted average from \(overlappingSeries.count) interval(s): \(sourceDescription)"
+                derivedValue,
+                "\(aggregationDescription) from \(overlappingSeries.count) interval(s): \(sourceDescription)"
             )
         }
 
@@ -697,7 +725,7 @@ final class NOAAClient {
         if let nearest {
             return (
                 nearest.normalizedValue,
-                "fallback nearest interval: \(nearest.validTime) value=\(formatDouble(nearest.normalizedValue))"
+                "fallback nearest interval for \(aggregation.description): \(nearest.validTime) value=\(formatDouble(nearest.normalizedValue))"
             )
         }
 
@@ -879,4 +907,23 @@ final class NOAAClient {
         calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
         return calendar
     }()
+}
+
+private extension NOAAClient {
+    enum SlotAggregation {
+        case overlapWeightedAverage
+        case slotMaximum
+        case slotMinimum
+
+        var description: String {
+            switch self {
+            case .overlapWeightedAverage:
+                return "overlap-weighted average"
+            case .slotMaximum:
+                return "slot maximum"
+            case .slotMinimum:
+                return "slot minimum"
+            }
+        }
+    }
 }
