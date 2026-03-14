@@ -10,7 +10,7 @@ import SwiftUI
 struct WeatherDebugView: View {
     @ObservedObject var locationManager: LocationManager
     @ObservedObject var bleManager: BLEManager
-    @StateObject private var viewModel = WeatherDebugViewModel()
+    @ObservedObject var viewModel: WeatherDebugViewModel
 
     private var requestCoordinateText: String {
         guard let fix = locationManager.currentFix else {
@@ -40,7 +40,7 @@ struct WeatherDebugView: View {
                 Button("Send RegionalSnapshotV1") {
                     if let packetDebug = viewModel.latestRegionalSnapshotPacketDebug {
                         if packetDebug.isPacketLengthValid {
-                            bleManager.sendRegionalSnapshotV1Debug(packetDebug)
+                            bleManager.sendLatestRegionalSnapshotV1Debug()
                         } else {
                             print("WeatherDebugView: RegionalSnapshotV1 send blocked packetLength=\(packetDebug.packetByteLength) expected=\(RegionalSnapshotBuilder.regionalSnapshotPacketSize)")
                         }

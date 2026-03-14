@@ -14,6 +14,7 @@ final class WeatherDebugViewModel: ObservableObject {
     @Published var lastErrorMessage: String?
     @Published var latestFieldWeatherData: ThreeByThreeWeatherFieldDebugData?
     @Published var latestRegionalSnapshotPacketDebug: RegionalSnapshotPacketDebugData?
+    @Published var latestPacketRevision = 0
 
     private let noaaClient: NOAAClient
 
@@ -48,12 +49,14 @@ final class WeatherDebugViewModel: ObservableObject {
         latestFieldWeatherData = weatherData
         let packetDebug = RegionalSnapshotBuilder.makeRegionalSnapshotV1DebugData(field: weatherData)
         latestRegionalSnapshotPacketDebug = packetDebug
+        latestPacketRevision += 1
         print(
             """
             WeatherDebugViewModel: NOAA 3x3 fetch completed \
             centerLat=\(weatherData.center.latitude) \
             centerLon=\(weatherData.center.longitude) \
-            anchors=\(weatherData.anchorResults.count)
+            anchors=\(weatherData.anchorResults.count) \
+            packetRevision=\(latestPacketRevision)
             """
         )
         if packetDebug.isPacketLengthValid {

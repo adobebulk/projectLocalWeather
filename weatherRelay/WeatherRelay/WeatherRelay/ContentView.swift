@@ -11,6 +11,7 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var bleManager = BLEManager()
     @StateObject private var locationManager = LocationManager()
+    @StateObject private var weatherDebugViewModel = WeatherDebugViewModel()
 
     private var latitudeText: String {
         guard let latitude = locationManager.latestLatitude else {
@@ -91,7 +92,11 @@ struct ContentView: View {
                     .disabled(!bleManager.didDiscoverCharacteristics || !locationManager.hasValidLocation)
 
                     NavigationLink("Weather Debug") {
-                        WeatherDebugView(locationManager: locationManager, bleManager: bleManager)
+                        WeatherDebugView(
+                            locationManager: locationManager,
+                            bleManager: bleManager,
+                            viewModel: weatherDebugViewModel
+                        )
                     }
                     .buttonStyle(.bordered)
 
@@ -127,6 +132,12 @@ struct ContentView: View {
                 """
             )
             bleManager.considerPositionSendIfDue(locationFix: locationManager.currentFix, trigger: "location-update")
+        }
+        .onChange(of: weatherDebugViewModel.latestPacketRevision) { _, newRevision in
+            bleManager.updateLatestWeatherField(
+                weatherDebugViewModel.latestFieldWeatherData,
+                revision: newRevision
+            )
         }
         .onChange(of: scenePhase) { _, newPhase in
             print("ContentView: scenePhase changed to \(newPhase.description)")

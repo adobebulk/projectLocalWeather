@@ -66,6 +66,15 @@ final class BLEManager: NSObject, ObservableObject {
     private var pendingWeatherChunkWriteType: CBCharacteristicWriteType?
     private var pendingWeatherChunkIndex = 0
     private var pendingWeatherChunkTotal = 0
+    private var latestWeatherField: ThreeByThreeWeatherFieldDebugData?
+    private var latestWeatherRevision = 0
+    private var lastAcceptedWeatherRevision = 0
+    private var nextWeatherSequenceNumber: UInt32 = 1
+    private var lastSuccessfulWeatherSendDate: Date?
+    private var lastSuccessfulWeatherSequence: UInt32?
+    private var pendingWeatherRevision: Int?
+    private var queuedPositionAfterWeatherFix: LocationManager.LocationFix?
+    private var queuedPositionAfterWeatherTrigger: String?
     private var restoredPeripheralPendingPoweredOn: CBPeripheral?
     private var restoredPeripheralWasConnected = false
 
@@ -170,12 +179,37 @@ final class BLEManager: NSObject, ObservableObject {
         pendingWeatherChunkWriteType = nil
         pendingWeatherChunkIndex = 0
         pendingWeatherChunkTotal = 0
+        pendingWeatherRevision = nil
+        queuedPositionAfterWeatherFix = nil
+        queuedPositionAfterWeatherTrigger = nil
         restoredPeripheralPendingPoweredOn = nil
         restoredPeripheralWasConnected = false
     }
 
     func sendPositionPacket(locationFix: LocationManager.LocationFix?) {
         sendPositionPacket(locationFix: locationFix, trigger: "manual")
+    }
+
+    func sendLatestRegionalSnapshotV1Debug() {
+        guard hasNewerWeatherToSend || latestWeatherField != nil else {
+            print("BLEManager: manual RegionalSnapshotV1 send skipped - no weather field available")
+            return
+        }
+
+        _ = sendLatestRegionalSnapshotV1(trigger: "manual")
+    }
+
+    func updateLatestWeatherField(_ field: ThreeByThreeWeatherFieldDebugData?, revision: Int) {
+        latestWeatherField = field
+        latestWeatherRevision = revision
+        print(
+            """
+            BLEManager: updated latest weather field \
+            revision=\(revision) \
+            hasField=\(field != nil) \
+            lastAcceptedWeatherRevision=\(lastAcceptedWeatherRevision)
+            """
+        )
     }
 
     func sendRegionalSnapshotV1Debug(_ packetDebug: RegionalSnapshotPacketDebugData) {
@@ -264,6 +298,10 @@ final class BLEManager: NSObject, ObservableObject {
             hasFix=\(locationFix != nil) \
             fixAgeSeconds=\(fixAgeDescription) \
             pendingSequence=\(pendingPositionSequence.map(String.init) ?? "none") \
+            pendingWeatherSequence=\(pendingWeatherSequence.map(String.init) ?? "none") \
+            pendingWeatherChunks=\(pendingWeatherChunkQueue.count) \
+            latestWeatherRevision=\(latestWeatherRevision) \
+            lastAcceptedWeatherRevision=\(lastAcceptedWeatherRevision) \
             lastSuccessfulSendUnix=\(lastSuccessfulDescription)
             """
         )
@@ -294,9 +332,13 @@ final class BLEManager: NSObject, ObservableObject {
             return
         }
 
+        guard pendingWeatherSequence == nil, pendingWeatherChunkQueue.isEmpty else {
+            print("BLEManager: send-if-due skipped - weather transfer in progress trigger=\(trigger)")
+            return
+        }
+
         guard let lastSuccessfulPositionSendDate else {
-            print("BLEManager: send-if-due allowed - no successful send yet trigger=\(trigger)")
-            sendPositionPacket(locationFix: locationFix, trigger: "initial/\(trigger)")
+            runNormalSendCycle(locationFix: locationFix, trigger: "initial/\(trigger)")
             return
         }
 
@@ -306,8 +348,7 @@ final class BLEManager: NSObject, ObservableObject {
             return
         }
 
-        print("BLEManager: send-if-due allowed - 10 minute interval elapsed secondsSinceLastSuccessfulSend=\(Int(secondsSinceLastSuccessfulSend)) trigger=\(trigger)")
-        sendPositionPacket(locationFix: locationFix, trigger: "periodic/\(trigger)")
+        runNormalSendCycle(locationFix: locationFix, trigger: "periodic/\(trigger)")
     }
 
     private func sendPositionPacket(locationFix: LocationManager.LocationFix?, trigger: String) {
@@ -391,6 +432,63 @@ final class BLEManager: NSObject, ObservableObject {
         pendingWeatherChunkIndex += 1
         print("BLEManager: sending RegionalSnapshotV1 chunk \(pendingWeatherChunkIndex)/\(pendingWeatherChunkTotal) bytes=\(chunk.count)")
         peripheral.writeValue(chunk, for: rxCharacteristic, type: writeType)
+    }
+
+    private func runNormalSendCycle(locationFix: LocationManager.LocationFix, trigger: String) {
+        if hasNewerWeatherToSend {
+            print("BLEManager: normal send cycle = weather+position trigger=\(trigger)")
+            queuedPositionAfterWeatherFix = locationFix
+            queuedPositionAfterWeatherTrigger = trigger
+            let startedWeatherSend = sendLatestRegionalSnapshotV1(trigger: "normal/\(trigger)")
+            if !startedWeatherSend {
+                print("BLEManager: weather send could not start, falling back to position-only trigger=\(trigger)")
+                queuedPositionAfterWeatherFix = nil
+                queuedPositionAfterWeatherTrigger = nil
+                sendPositionPacket(locationFix: locationFix, trigger: trigger)
+            }
+        } else {
+            print("BLEManager: normal send cycle = position-only trigger=\(trigger)")
+            print("BLEManager: weather skipped on normal send - no newer field trigger=\(trigger)")
+            sendPositionPacket(locationFix: locationFix, trigger: trigger)
+        }
+    }
+
+    private var hasNewerWeatherToSend: Bool {
+        latestWeatherField != nil && latestWeatherRevision > lastAcceptedWeatherRevision
+    }
+
+    private func sendLatestRegionalSnapshotV1(trigger: String) -> Bool {
+        guard let latestWeatherField else {
+            print("BLEManager: RegionalSnapshotV1 send skipped - no latest weather field trigger=\(trigger)")
+            return false
+        }
+
+        let sequence = nextWeatherSequenceNumber
+        nextWeatherSequenceNumber += 1
+        let packetDebug = RegionalSnapshotBuilder.makeRegionalSnapshotV1DebugData(
+            field: latestWeatherField,
+            sequence: sequence
+        )
+
+        guard packetDebug.isPacketLengthValid else {
+            print("BLEManager: RegionalSnapshotV1 send skipped - built packet invalid trigger=\(trigger) bytes=\(packetDebug.packetByteLength)")
+            return false
+        }
+
+        pendingWeatherRevision = latestWeatherRevision
+        sendRegionalSnapshotV1Debug(packetDebug)
+        return true
+    }
+
+    private func continueQueuedPositionAfterWeather(reason: String) {
+        guard let queuedPositionAfterWeatherFix, let queuedPositionAfterWeatherTrigger else {
+            return
+        }
+
+        self.queuedPositionAfterWeatherFix = nil
+        self.queuedPositionAfterWeatherTrigger = nil
+        print("BLEManager: continuing queued position send after weather reason=\(reason) trigger=\(queuedPositionAfterWeatherTrigger)")
+        sendPositionPacket(locationFix: queuedPositionAfterWeatherFix, trigger: "after-weather/\(queuedPositionAfterWeatherTrigger)")
     }
 
     private func resumeRestoredPeripheralIfNeeded() {
@@ -681,11 +779,19 @@ extension BLEManager: CBPeripheralDelegate {
                 pendingPositionSequence = nil
                 pendingPositionTrigger = nil
             } else if ack.status == .ok, ack.sequence == pendingWeatherSequence {
+                let acceptedAt = Date()
+                lastSuccessfulWeatherSendDate = acceptedAt
+                lastSuccessfulWeatherSequence = ack.sequence
+                if let pendingWeatherRevision {
+                    lastAcceptedWeatherRevision = pendingWeatherRevision
+                }
                 print(
                     """
                     BLEManager: RegionalSnapshotV1 send accepted \
                     sequence=\(ack.sequence) \
-                    activeWeatherTimestamp=\(ack.weatherTimestamp)
+                    activeWeatherTimestamp=\(ack.weatherTimestamp) \
+                    acceptedAtUnix=\(Int(acceptedAt.timeIntervalSince1970)) \
+                    acceptedWeatherRevision=\(lastAcceptedWeatherRevision)
                     """
                 )
                 pendingWeatherSequence = nil
@@ -693,6 +799,8 @@ extension BLEManager: CBPeripheralDelegate {
                 pendingWeatherChunkWriteType = nil
                 pendingWeatherChunkIndex = 0
                 pendingWeatherChunkTotal = 0
+                pendingWeatherRevision = nil
+                continueQueuedPositionAfterWeather(reason: "weather-ack-ok")
             } else if ack.sequence == pendingPositionSequence {
                 print(
                     """
@@ -717,6 +825,8 @@ extension BLEManager: CBPeripheralDelegate {
                 pendingWeatherChunkWriteType = nil
                 pendingWeatherChunkIndex = 0
                 pendingWeatherChunkTotal = 0
+                pendingWeatherRevision = nil
+                continueQueuedPositionAfterWeather(reason: "weather-ack-not-ok")
             } else {
                 print(
                     """
@@ -745,6 +855,7 @@ extension BLEManager: CBPeripheralDelegate {
                 pendingWeatherChunkIndex = 0
                 pendingWeatherChunkTotal = 0
                 pendingWeatherSequence = nil
+                pendingWeatherRevision = nil
             }
             return
         }
