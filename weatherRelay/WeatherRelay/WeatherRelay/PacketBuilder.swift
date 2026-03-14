@@ -11,8 +11,10 @@ enum PacketBuilder {
     static let magic: UInt16 = 0x5743
     static let version: UInt8 = 1
     static let packetTypePositionUpdateV1: UInt8 = 2
+    static let packetTypeAckV1: UInt8 = 3
     static let headerSize = 18
     static let positionPacketSize = 32
+    static let ackPacketSize = 32
     static let crcOffset = 14
 
     struct PositionValues {

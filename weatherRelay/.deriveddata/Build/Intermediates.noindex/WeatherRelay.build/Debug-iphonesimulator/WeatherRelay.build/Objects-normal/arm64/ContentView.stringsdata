@@ -15,7 +15,7 @@
         "key": "Service discovered",
         "location": {
           "startingColumn": 22,
-          "startingLine": 33
+          "startingLine": 37
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "RX/TX characteristics discovered",
         "location": {
           "startingColumn": 22,
-          "startingLine": 38
+          "startingLine": 42
         }
       },
       {
@@ -31,7 +31,7 @@
         "key": "Send Test Payload",
         "location": {
           "startingColumn": 20,
-          "startingLine": 42
+          "startingLine": 46
         }
       },
       {
@@ -39,7 +39,7 @@
         "key": "Send Position Packet",
         "location": {
           "startingColumn": 20,
-          "startingLine": 48
+          "startingLine": 52
         }
       },
       {
@@ -80,6 +80,38 @@
         "location": {
           "startingColumn": 22,
           "startingLine": 27
+        }
+      },
+      {
+        "comment": "",
+        "key": "Last ACK status: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 28
+        }
+      },
+      {
+        "comment": "",
+        "key": "ACK echoed sequence: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 29
+        }
+      },
+      {
+        "comment": "",
+        "key": "ACK weather timestamp: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 30
+        }
+      },
+      {
+        "comment": "",
+        "key": "ACK position timestamp: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 31
         }
       }
     ]

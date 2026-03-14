@@ -27,6 +27,10 @@ final class BLEManager: NSObject, ObservableObject {
     @Published var lastDiscoveredRSSI = "-"
     @Published var lastDiscoveredServiceUUIDs = "-"
     @Published var lastSentPacketHex = "-"
+    @Published var lastAckStatus = "-"
+    @Published var lastAckEchoedSequence = "-"
+    @Published var lastAckActiveWeatherTimestamp = "-"
+    @Published var lastAckActivePositionTimestamp = "-"
 
     var statusText: String {
         if !bluetoothPoweredOn {
@@ -98,6 +102,10 @@ final class BLEManager: NSObject, ObservableObject {
         lastDiscoveredRSSI = "-"
         lastDiscoveredServiceUUIDs = "-"
         lastSentPacketHex = "-"
+        lastAckStatus = "-"
+        lastAckEchoedSequence = "-"
+        lastAckActiveWeatherTimestamp = "-"
+        lastAckActivePositionTimestamp = "-"
         targetPeripheral = nil
         rxCharacteristic = nil
         txCharacteristic = nil
@@ -320,6 +328,31 @@ extension BLEManager: CBPeripheralDelegate {
 
         let data = characteristic.value ?? Data()
         print("BLEManager: received notification on \(characteristic.uuid.uuidString) hex=\(data.hexString)")
+
+        guard characteristic.uuid == Self.txCharacteristicUUID else {
+            return
+        }
+
+        do {
+            let ack = try AckParser.parse(data)
+            lastAckStatus = String(ack.statusCode)
+            lastAckEchoedSequence = String(ack.echoedSequence)
+            lastAckActiveWeatherTimestamp = String(ack.activeWeatherTimestampUnix)
+            lastAckActivePositionTimestamp = String(ack.activePositionTimestampUnix)
+
+            print(
+                """
+                BLEManager: parsed AckV1 \
+                status=\(ack.statusCode) \
+                echoedSequence=\(ack.echoedSequence) \
+                activeWeatherTimestamp=\(ack.activeWeatherTimestampUnix) \
+                activePositionTimestamp=\(ack.activePositionTimestampUnix) \
+                reserved=\(ack.reserved)
+                """
+            )
+        } catch {
+            print("BLEManager: AckV1 parse failed error=\(error.localizedDescription)")
+        }
     }
 
     func peripheral(_ peripheral: CBPeripheral,

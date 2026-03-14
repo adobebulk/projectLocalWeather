@@ -25,6 +25,10 @@ struct ContentView: View {
                 Text("Last advertised name: \(bleManager.lastAdvertisedLocalName)")
                 Text("Found target: \(bleManager.didFindDevice ? "Yes" : "No")")
                 Text("Last sent packet: \(bleManager.lastSentPacketHex)")
+                Text("Last ACK status: \(bleManager.lastAckStatus)")
+                Text("ACK echoed sequence: \(bleManager.lastAckEchoedSequence)")
+                Text("ACK weather timestamp: \(bleManager.lastAckActiveWeatherTimestamp)")
+                Text("ACK position timestamp: \(bleManager.lastAckActivePositionTimestamp)")
             }
             .font(.subheadline)
             .frame(maxWidth: .infinity, alignment: .leading)
