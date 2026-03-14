@@ -9,25 +9,17 @@
 namespace {
 
 void logEstimate(const interpolation::LocalEstimate& estimate, Stream& serial) {
-  serial.print("ESTIMATE: temp_t10=");
-  serial.print(estimate.air_temp_c_tenths);
-  serial.print(" wind_t10=");
-  serial.print(estimate.wind_speed_mps_tenths);
-  serial.print(" gust_t10=");
-  serial.print(estimate.wind_gust_mps_tenths);
-  serial.print(" precip_pct=");
-  serial.print(estimate.precip_prob_pct);
-  serial.print(" kind=");
-  serial.print(estimate.precip_kind);
-  serial.print(" intensity=");
-  serial.println(estimate.precip_intensity);
+  char line[96];
+  snprintf(line, sizeof(line),
+           "ESTIMATE: temp_t10=%d wind_t10=%u gust_t10=%u precip_pct=%u kind=%u intensity=%u",
+           estimate.air_temp_c_tenths, estimate.wind_speed_mps_tenths,
+           estimate.wind_gust_mps_tenths, estimate.precip_prob_pct, estimate.precip_kind,
+           estimate.precip_intensity);
+  serial.println(line);
 
-  serial.print("ESTIMATE: vis_m=");
-  serial.print(estimate.visibility_m);
-  serial.print(" hazard=0x");
-  serial.print(estimate.hazard_flags, HEX);
-  serial.print(" confidence=");
-  serial.println(estimate.confidence_score);
+  snprintf(line, sizeof(line), "ESTIMATE: vis_m=%u hazard=0x%X confidence=%u",
+           estimate.visibility_m, estimate.hazard_flags, estimate.confidence_score);
+  serial.println(line);
 }
 
 void updateRuntimeDisplay(const interpolation::LocalEstimate& estimate, Stream& serial) {

@@ -19,6 +19,8 @@ namespace {
 
 constexpr char kDeviceName[] = "WeatherComputer";
 constexpr size_t kRxBufferSize = 512;
+constexpr size_t kPendingPacketBufferSize = 512;
+constexpr size_t kPendingPacketQueueDepth = 2;
 constexpr size_t kHexPreviewBytes = 16;
 
 constexpr char kServiceUuid[] = "19B10010-E8F2-537E-4F6C-D104768A1214";
@@ -35,6 +37,11 @@ bool g_restart_advertising = false;
 uint8_t g_ack_payload[3] = {'A', 'C', 'K'};
 uint8_t g_rx_buffer[kRxBufferSize];
 size_t g_rx_length = 0;
+uint8_t g_pending_packets[kPendingPacketQueueDepth][kPendingPacketBufferSize];
+size_t g_pending_packet_lengths[kPendingPacketQueueDepth] = {};
+size_t g_pending_packet_head = 0;
+size_t g_pending_packet_tail = 0;
+size_t g_pending_packet_count = 0;
 
 void logLine(const char* message) {
   if (g_serial == nullptr) {
@@ -64,6 +71,20 @@ void logHexPreview(const uint8_t* data, size_t length) {
   g_serial->println(line);
 }
 
+void logUnsignedValueLine(const char* prefix, size_t value, const char* suffix = nullptr) {
+  if (g_serial == nullptr) {
+    return;
+  }
+
+  char line[64];
+  if (suffix == nullptr) {
+    snprintf(line, sizeof(line), "%s%u", prefix, static_cast<unsigned>(value));
+  } else {
+    snprintf(line, sizeof(line), "%s%u%s", prefix, static_cast<unsigned>(value), suffix);
+  }
+  g_serial->println(line);
+}
+
 void sendAck() {
   if (g_tx_characteristic == nullptr) {
     logLine("BLE: tx skipped, TX characteristic not ready");
@@ -82,39 +103,74 @@ void sendAck() {
 }
 
 void logAssemblerResult(const packet_assembler::FeedResult& result) {
-  if (g_serial == nullptr) {
-    return;
-  }
-
-  g_serial->print("ASSEMBLER: fragment len=");
-  g_serial->println(result.fragment_length);
+  logUnsignedValueLine("ASSEMBLER: fragment len=", result.fragment_length);
 
   if (result.dropped_garbage_bytes > 0) {
-    g_serial->print("ASSEMBLER: dropped garbage len=");
-    g_serial->println(result.dropped_garbage_bytes);
+    logUnsignedValueLine("ASSEMBLER: dropped garbage len=", result.dropped_garbage_bytes);
   }
 
-  g_serial->print("ASSEMBLER: buffered=");
-  g_serial->println(result.bytes_buffered);
+  logUnsignedValueLine("ASSEMBLER: buffered=", result.bytes_buffered);
 
   if (result.expected_length_known) {
-    g_serial->print("ASSEMBLER: expected len=");
-    g_serial->println(result.expected_packet_length);
+    logUnsignedValueLine("ASSEMBLER: expected len=", result.expected_packet_length);
   }
 
   if (result.malformed_start) {
-    g_serial->print("ASSEMBLER: malformed start len=");
-    g_serial->println(result.expected_packet_length);
+    logUnsignedValueLine("ASSEMBLER: malformed start len=", result.expected_packet_length);
   }
 
   if (result.packet_complete) {
-    g_serial->print("ASSEMBLER: packet complete len=");
-    g_serial->println(result.packet_length);
+    logUnsignedValueLine("ASSEMBLER: packet complete len=", result.packet_length);
   }
 }
 
 void logParserResult(const protocol_parser::ParseResult& result) {
   logLine(protocol_parser::statusToLogMessage(result.status, result.header.packet_type));
+}
+
+bool enqueueCompletedPacket() {
+  if (!packet_assembler::hasCompletePacket()) {
+    return false;
+  }
+
+  const size_t packet_length = packet_assembler::completePacketLength();
+  if (packet_length == 0 || packet_length > kPendingPacketBufferSize) {
+    logLine("BLE: packet queue rejected oversized packet");
+    packet_assembler::consumePacket();
+    return false;
+  }
+
+  if (g_pending_packet_count >= kPendingPacketQueueDepth) {
+    logLine("BLE: packet queue full, dropping complete packet");
+    packet_assembler::consumePacket();
+    return false;
+  }
+
+  memcpy(g_pending_packets[g_pending_packet_tail], packet_assembler::completePacketData(),
+         packet_length);
+  g_pending_packet_lengths[g_pending_packet_tail] = packet_length;
+  g_pending_packet_tail = (g_pending_packet_tail + 1) % kPendingPacketQueueDepth;
+  ++g_pending_packet_count;
+  packet_assembler::consumePacket();
+  return true;
+}
+
+void processPendingPackets() {
+  while (g_pending_packet_count > 0) {
+    const uint8_t* packet = g_pending_packets[g_pending_packet_head];
+    const size_t packet_length = g_pending_packet_lengths[g_pending_packet_head];
+
+    const protocol_parser::ParseResult parse_result =
+        protocol_parser::parsePacket(packet, packet_length);
+    logParserResult(parse_result);
+    if (g_serial != nullptr) {
+      ingress_router::handlePacket(parse_result, *g_serial);
+    }
+
+    g_pending_packet_lengths[g_pending_packet_head] = 0;
+    g_pending_packet_head = (g_pending_packet_head + 1) % kPendingPacketQueueDepth;
+    --g_pending_packet_count;
+  }
 }
 
 class ServerCallbacks : public BLEServerCallbacks {
@@ -144,16 +200,10 @@ class RxCallbacks : public BLECharacteristicCallbacks {
       memcpy(g_rx_buffer, value.data(), g_rx_length);
     }
 
-    if (g_serial != nullptr) {
-      g_serial->print("BLE: rx chunk ");
-      g_serial->print(incoming_length);
-      g_serial->println(" bytes");
-    }
+    logUnsignedValueLine("BLE: rx chunk ", incoming_length, " bytes");
 
-    if (incoming_length > kRxBufferSize && g_serial != nullptr) {
-      g_serial->print("BLE: rx chunk truncated to ");
-      g_serial->print(kRxBufferSize);
-      g_serial->println(" bytes");
+    if (incoming_length > kRxBufferSize) {
+      logUnsignedValueLine("BLE: rx chunk truncated to ", kRxBufferSize, " bytes");
     }
 
     logHexPreview(g_rx_buffer, g_rx_length);
@@ -161,12 +211,7 @@ class RxCallbacks : public BLECharacteristicCallbacks {
         packet_assembler::pushFragment(g_rx_buffer, g_rx_length);
     logAssemblerResult(assembler_result);
     if (packet_assembler::hasCompletePacket()) {
-      const protocol_parser::ParseResult parse_result =
-          protocol_parser::parsePacket(packet_assembler::completePacketData(),
-                                       packet_assembler::completePacketLength());
-      logParserResult(parse_result);
-      ingress_router::handlePacket(parse_result, *g_serial);
-      packet_assembler::consumePacket();
+      enqueueCompletedPacket();
     }
     sendAck();
   }
@@ -184,6 +229,9 @@ bool begin(Stream& serial) {
   g_ready = false;
   device_state::reset();
   packet_assembler::reset();
+  g_pending_packet_head = 0;
+  g_pending_packet_tail = 0;
+  g_pending_packet_count = 0;
 
   serial.println("BLE: init start");
 
@@ -235,6 +283,8 @@ void tick(Stream& serial) {
   if (!g_ready) {
     return;
   }
+
+  processPendingPackets();
 
   if (g_restart_advertising) {
     g_restart_advertising = false;

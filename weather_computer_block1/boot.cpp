@@ -9,7 +9,7 @@
 
 namespace {
 
-constexpr unsigned long kIdleDelayMs = 1000;
+constexpr unsigned long kIdleDelayMs = 20;
 
 }  // namespace
 
