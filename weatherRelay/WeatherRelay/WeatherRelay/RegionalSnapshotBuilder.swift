@@ -69,8 +69,6 @@ enum RegionalSnapshotBuilder {
     private static let gridCols: UInt8 = 3
     private static let reserved0: UInt8 = 0
     private static let forecastHorizonMin: UInt16 = 120
-    // Block 1 fallback so "missing" visibility is not serialized as literal zero.
-    private static let missingVisibilityFallbackM: UInt16 = 16_093
 
     static func makeRegionalSnapshotV1DebugData(
         field: ThreeByThreeWeatherFieldDebugData,
@@ -238,7 +236,7 @@ enum RegionalSnapshotBuilder {
             notes.append("hazardSummary=\(slot.hazardSummary ?? "nil")")
             notes.append("hazardRule=\(slot.hazardSelectionNote)")
         } else {
-            notes.append("slot missing/offshore -> slot_offset_min encoded and all remaining fields zeroed per provisional convention")
+            notes.append("slot missing/offshore -> slot_offset_min encoded and remaining fields serialized as 0 by current protocol convention")
         }
 
         let slotOffsetMin = UInt16(offsetMinutes)
@@ -385,7 +383,16 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> (kind: PrecipitationKind, isPresent: Bool) {
         guard let slot else {
-            notes.append("precipitationKind missing/offshore -> encoded noneOrUnknown in packet")
+            notes.append("precipitationKind missing/offshore -> encoded noneOrUnknown (0) by current protocol convention")
+            print(
+                """
+                RegionalSnapshotBuilder: precipitationKind missing \
+                anchor=\(anchorLabel) \
+                offsetMinutes=\(offsetMinutes) \
+                encoded=noneOrUnknown(0) \
+                reason=missing-source
+                """
+            )
             return (.noneOrUnknown, false)
         }
 
@@ -394,7 +401,16 @@ enum RegionalSnapshotBuilder {
             .joined(separator: " | ")
 
         guard !summary.isEmpty else {
-            notes.append("precipitationKind unavailable -> encoded noneOrUnknown in packet")
+            notes.append("precipitationKind unavailable -> encoded noneOrUnknown (0) by current protocol convention")
+            print(
+                """
+                RegionalSnapshotBuilder: precipitationKind unavailable \
+                anchor=\(anchorLabel) \
+                offsetMinutes=\(offsetMinutes) \
+                encoded=noneOrUnknown(0) \
+                reason=no-mappable-source-text
+                """
+            )
             return (.noneOrUnknown, false)
         }
 
@@ -411,7 +427,7 @@ enum RegionalSnapshotBuilder {
         if isPresent {
             notes.append("precipitationKind derived from slot weather/hazard text summary")
         } else {
-            notes.append("precipitationKind text had no mappable precipitation kind -> encoded noneOrUnknown in packet")
+            notes.append("precipitationKind text had no mappable precipitation kind -> encoded noneOrUnknown (0) by current protocol convention")
         }
 
         print("RegionalSnapshotBuilder: precip kind anchor=\(anchorLabel) offsetMinutes=\(offsetMinutes) kind=\(prioritized.description) summary=\(summary)")
@@ -425,7 +441,16 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> (intensity: PrecipitationIntensity, isPresent: Bool) {
         guard let slot, let weatherSummary = slot.weatherSummary?.lowercased(), !weatherSummary.isEmpty else {
-            notes.append("precipitationIntensity unavailable -> encoded noneOrUnknown in packet")
+            notes.append("precipitationIntensity unavailable -> encoded noneOrUnknown (0) by current protocol convention")
+            print(
+                """
+                RegionalSnapshotBuilder: precipitationIntensity unavailable \
+                anchor=\(anchorLabel) \
+                offsetMinutes=\(offsetMinutes) \
+                encoded=noneOrUnknown(0) \
+                reason=missing-or-empty-weather-summary
+                """
+            )
             return (.noneOrUnknown, false)
         }
 
@@ -444,7 +469,7 @@ enum RegionalSnapshotBuilder {
         if isPresent {
             notes.append("precipitationIntensity derived from NOAA weather intensity text")
         } else {
-            notes.append("precipitationIntensity not derivable from NOAA weather text -> encoded noneOrUnknown in packet")
+            notes.append("precipitationIntensity not derivable from NOAA weather text -> encoded noneOrUnknown (0) by current protocol convention")
         }
 
         print("RegionalSnapshotBuilder: precip intensity anchor=\(anchorLabel) offsetMinutes=\(offsetMinutes) intensity=\(intensity.description) weatherSummary=\(weatherSummary)")
@@ -459,7 +484,16 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> (flags: HazardFlags, isPresent: Bool) {
         guard let slot else {
-            notes.append("hazardFlags unavailable/offshore -> encoded 0 in packet")
+            notes.append("hazardFlags unavailable/offshore -> serialized as 0 by current protocol convention")
+            print(
+                """
+                RegionalSnapshotBuilder: hazardFlags missing \
+                anchor=\(anchorLabel) \
+                offsetMinutes=\(offsetMinutes) \
+                encoded=0 \
+                reason=missing-source
+                """
+            )
             return ([], false)
         }
 
@@ -509,7 +543,16 @@ enum RegionalSnapshotBuilder {
         if hadEvidence {
             notes.append("hazardFlags derived conservatively from slot weather/hazard text plus metric thresholds")
         } else {
-            notes.append("hazardFlags unavailable -> encoded 0 in packet")
+            notes.append("hazardFlags unavailable -> serialized as 0 by current protocol convention")
+            print(
+                """
+                RegionalSnapshotBuilder: hazardFlags unavailable \
+                anchor=\(anchorLabel) \
+                offsetMinutes=\(offsetMinutes) \
+                encoded=0 \
+                reason=no-usable-source-evidence
+                """
+            )
         }
 
         print("RegionalSnapshotBuilder: hazard flags anchor=\(anchorLabel) offsetMinutes=\(offsetMinutes) flags=\(flags.description) summary=\(combinedSummary)")
@@ -565,7 +608,16 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> Int16 {
         guard let value else {
-            notes.append("\(fieldName) missing/offshore -> encoded 0 in packet")
+            notes.append("\(fieldName) missing/offshore -> serialized as 0 by current protocol convention")
+            print(
+                """
+                RegionalSnapshotBuilder: \(fieldName) missing \
+                anchor=\(anchorLabel) \
+                offsetMinutes=\(offsetMinutes) \
+                encoded=0 \
+                reason=missing-source
+                """
+            )
             return 0
         }
 
@@ -587,7 +639,16 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> UInt16 {
         guard let value else {
-            notes.append("\(fieldName) missing/offshore -> encoded 0 in packet")
+            notes.append("\(fieldName) missing/offshore -> serialized as 0 by current protocol convention")
+            print(
+                """
+                RegionalSnapshotBuilder: \(fieldName) missing \
+                anchor=\(anchorLabel) \
+                offsetMinutes=\(offsetMinutes) \
+                encoded=0 \
+                reason=missing-source
+                """
+            )
             return 0
         }
 
@@ -611,7 +672,16 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> UInt8 {
         guard let value else {
-            notes.append("\(fieldName) missing/offshore -> encoded 0 in packet")
+            notes.append("\(fieldName) missing/offshore -> serialized as 0 by current protocol convention")
+            print(
+                """
+                RegionalSnapshotBuilder: \(fieldName) missing \
+                anchor=\(anchorLabel) \
+                offsetMinutes=\(offsetMinutes) \
+                encoded=0 \
+                reason=missing-source
+                """
+            )
             return 0
         }
 
@@ -632,16 +702,17 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> UInt16 {
         guard let value else {
-            notes.append("visibility missing/offshore -> encoded fallback 16093 m in packet (Block 1 provisional unknown-visibility handling)")
+            notes.append("visibility missing/offshore -> serialized as 0 by current protocol convention")
             print(
                 """
-                RegionalSnapshotBuilder: visibility missing fallback \
+                RegionalSnapshotBuilder: visibility missing \
                 anchor=\(anchorLabel) \
                 offsetMinutes=\(offsetMinutes) \
-                fallbackM=\(missingVisibilityFallbackM)
+                encoded=0 \
+                reason=missing-source
                 """
             )
-            return missingVisibilityFallbackM
+            return 0
         }
 
         let raw = Int(Swift.max(0, value).rounded())

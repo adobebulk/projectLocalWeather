@@ -184,6 +184,7 @@ void buildLine1(const interpolation::LocalEstimate& estimate, char* out_line) {
 
 const char* interpretationText(const interpolation::LocalEstimate& estimate) {
   // Line 2 keeps a single dominant interpretation to preserve space for CXX%.
+  const bool visibility_known = !visibilityMissing(estimate.visibility_m);
   if (hasHazard(estimate.hazard_flags, 0) || hasHazard(estimate.hazard_flags, 1)) {
     return "THUNDER";
   }
@@ -196,13 +197,13 @@ const char* interpretationText(const interpolation::LocalEstimate& estimate) {
   if (estimate.precip_kind == 1) {
     return "RAIN";
   }
-  if (!visibilityMissing(estimate.visibility_m) && estimate.visibility_m < 1000) {
+  if (visibility_known && estimate.visibility_m < 1000) {
     return "FOG";
   }
-  if (!visibilityMissing(estimate.visibility_m) && estimate.visibility_m < 3000) {
+  if (visibility_known && estimate.visibility_m < 3000) {
     return "SMOKE";
   }
-  if (!visibilityMissing(estimate.visibility_m) && estimate.visibility_m < 8000) {
+  if (visibility_known && estimate.visibility_m < 8000) {
     return "HAZE";
   }
   if (estimate.precip_kind == 3 || estimate.precip_kind == 5 || estimate.precip_kind == 6 ||
@@ -212,6 +213,13 @@ const char* interpretationText(const interpolation::LocalEstimate& estimate) {
   if (hasHazard(estimate.hazard_flags, 3)) {
     return "WINDY";
   }
+
+  // Visibility can be missing in Block 1 packets. If no other strong signal is
+  // present, keep line 2 neutral instead of inferring CLEAR from unknown data.
+  if (!visibility_known) {
+    return "UNKNOWN";
+  }
+
   return "CLEAR";
 }
 
