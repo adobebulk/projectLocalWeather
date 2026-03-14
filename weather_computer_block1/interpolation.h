@@ -40,6 +40,8 @@ InterpolationStatus estimateLocalConditions(
     LocalEstimate* out_estimate);
 
 const char* statusToString(InterpolationStatus status);
+void logWeatherFieldValidationFailure(const protocol_parser::RegionalSnapshotV1& weather,
+                                      Stream& serial);
 
 }  // namespace interpolation
 

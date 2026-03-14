@@ -61,6 +61,9 @@ void recomputeEstimate(device_state::DeviceState* state, Stream& serial) {
   if (status != interpolation::kInterpolationOk) {
     state->has_estimate = false;
     state->estimate_timestamp = recompute_timestamp;
+    if (status == interpolation::kInterpolationInvalidWeatherField) {
+      interpolation::logWeatherFieldValidationFailure(state->weather, serial);
+    }
     serial.print("ESTIMATE: failed ");
     serial.println(interpolation::statusToString(status));
     return;

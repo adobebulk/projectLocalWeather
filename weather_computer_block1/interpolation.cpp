@@ -105,6 +105,90 @@ bool validateWeatherField(const protocol_parser::RegionalSnapshotV1& weather) {
   return true;
 }
 
+void logWeatherFieldFailure(const protocol_parser::RegionalSnapshotV1& weather, Stream& serial) {
+  const protocol_parser::RegionalSnapshotMetadataV1& metadata = weather.metadata;
+
+  if (metadata.field_width_mi != interpolation::kFieldWidthMiles) {
+    serial.print("ESTIMATE: weather field invalid reason=field_width expected=");
+    serial.print(interpolation::kFieldWidthMiles);
+    serial.print(" actual=");
+    serial.println(metadata.field_width_mi);
+    return;
+  }
+
+  if (metadata.field_height_mi != interpolation::kFieldHeightMiles) {
+    serial.print("ESTIMATE: weather field invalid reason=field_height expected=");
+    serial.print(interpolation::kFieldHeightMiles);
+    serial.print(" actual=");
+    serial.println(metadata.field_height_mi);
+    return;
+  }
+
+  if (metadata.grid_rows != interpolation::kGridRows) {
+    serial.print("ESTIMATE: weather field invalid reason=grid_rows expected=");
+    serial.print(interpolation::kGridRows);
+    serial.print(" actual=");
+    serial.println(metadata.grid_rows);
+    return;
+  }
+
+  if (metadata.grid_cols != interpolation::kGridCols) {
+    serial.print("ESTIMATE: weather field invalid reason=grid_cols expected=");
+    serial.print(interpolation::kGridCols);
+    serial.print(" actual=");
+    serial.println(metadata.grid_cols);
+    return;
+  }
+
+  if (metadata.slot_count != interpolation::kSlotCount) {
+    serial.print("ESTIMATE: weather field invalid reason=slot_count expected=");
+    serial.print(interpolation::kSlotCount);
+    serial.print(" actual=");
+    serial.println(metadata.slot_count);
+    return;
+  }
+
+  if (metadata.forecast_horizon_min != interpolation::kForecastHorizonMinutes) {
+    serial.print("ESTIMATE: weather field invalid reason=forecast_horizon expected=");
+    serial.print(interpolation::kForecastHorizonMinutes);
+    serial.print(" actual=");
+    serial.println(metadata.forecast_horizon_min);
+    return;
+  }
+
+  for (size_t anchor_index = 0; anchor_index < protocol_parser::kAnchorCount; ++anchor_index) {
+    const uint16_t slot0_offset = weather.anchor_slots[anchor_index][0].slot_offset_min;
+    const uint16_t slot1_offset = weather.anchor_slots[anchor_index][1].slot_offset_min;
+    const uint16_t slot2_offset = weather.anchor_slots[anchor_index][2].slot_offset_min;
+
+    if (slot0_offset != 0) {
+      serial.print("ESTIMATE: weather field invalid reason=slot_offset anchor=");
+      serial.print(anchor_index);
+      serial.print(" slot=0 expected=0 actual=");
+      serial.println(slot0_offset);
+      return;
+    }
+
+    if (slot1_offset != 60) {
+      serial.print("ESTIMATE: weather field invalid reason=slot_offset anchor=");
+      serial.print(anchor_index);
+      serial.print(" slot=1 expected=60 actual=");
+      serial.println(slot1_offset);
+      return;
+    }
+
+    if (slot2_offset != 120) {
+      serial.print("ESTIMATE: weather field invalid reason=slot_offset anchor=");
+      serial.print(anchor_index);
+      serial.print(" slot=2 expected=120 actual=");
+      serial.println(slot2_offset);
+      return;
+    }
+  }
+
+  serial.println("ESTIMATE: weather field invalid reason=unknown");
+}
+
 bool validatePosition(const protocol_parser::PositionUpdateV1& position) {
   if (position.lat_e5 < -9000000 || position.lat_e5 > 9000000) {
     return false;
@@ -433,6 +517,11 @@ const char* statusToString(InterpolationStatus status) {
     return "invalid weather field";
   }
   return "invalid position";
+}
+
+void logWeatherFieldValidationFailure(const protocol_parser::RegionalSnapshotV1& weather,
+                                      Stream& serial) {
+  logWeatherFieldFailure(weather, serial);
 }
 
 }  // namespace interpolation
