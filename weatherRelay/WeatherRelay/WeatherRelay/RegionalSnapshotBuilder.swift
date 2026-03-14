@@ -42,15 +42,16 @@ struct RegionalSnapshotAnchorPacketDebug: Identifiable {
 
 struct RegionalSnapshotSlotPacketDebug: Identifiable {
     let offsetMinutes: Int
+    let slotOffsetMin: UInt16
     let temperatureDeciC: Int16
-    let windSpeedDeciKmh: UInt16
-    let windGustDeciKmh: UInt16
+    let windSpeedMpsTenths: UInt16
+    let windGustMpsTenths: UInt16
     let precipitationProbabilityPercent: UInt8
     let precipitationKind: PrecipitationKind
     let precipitationIntensity: PrecipitationIntensity
-    let visibilityDam: UInt16
+    let reserved0: UInt8
+    let visibilityM: UInt16
     let hazardFlags: HazardFlags
-    let presenceFlags: UInt8
     let quantizationNotes: [String]
 
     var id: Int { offsetMinutes }
@@ -178,6 +179,16 @@ enum RegionalSnapshotBuilder {
             "RegionalSnapshotBuilder: layout metadata forecast_horizon_min offsets=34..35 size=2",
             "RegionalSnapshotBuilder: layout metadata source_age_min offsets=36..37 size=2",
             "RegionalSnapshotBuilder: layout cells offsets=38..469 size=432",
+            "RegionalSnapshotBuilder: cell layout slot_offset_min offsets=0..1 size=2",
+            "RegionalSnapshotBuilder: cell layout air_temp_c_tenths offsets=2..3 size=2",
+            "RegionalSnapshotBuilder: cell layout wind_speed_mps_tenths offsets=4..5 size=2",
+            "RegionalSnapshotBuilder: cell layout wind_gust_mps_tenths offsets=6..7 size=2",
+            "RegionalSnapshotBuilder: cell layout precip_prob_pct offset=8 size=1",
+            "RegionalSnapshotBuilder: cell layout precip_kind offset=9 size=1",
+            "RegionalSnapshotBuilder: cell layout precip_intensity offset=10 size=1",
+            "RegionalSnapshotBuilder: cell layout reserved0 offset=11 size=1",
+            "RegionalSnapshotBuilder: cell layout visibility_m offsets=12..13 size=2",
+            "RegionalSnapshotBuilder: cell layout hazard_flags offsets=14..15 size=2",
             "RegionalSnapshotBuilder: layout totals header=18 metadata=20 cells=432 total=470"
         ]
     }
@@ -191,16 +202,16 @@ enum RegionalSnapshotBuilder {
             let slot = slots.first(where: { $0.offsetMinutes == offsetMinutes })
             let debugSlot = quantizeSlot(anchorLabel: anchorResult.anchor.label, offsetMinutes: offsetMinutes, slot: slot)
 
+            packet.appendLittleEndian(debugSlot.slotOffsetMin)
             packet.appendLittleEndian(debugSlot.temperatureDeciC)
-            packet.appendLittleEndian(debugSlot.windSpeedDeciKmh)
-            packet.appendLittleEndian(debugSlot.windGustDeciKmh)
+            packet.appendLittleEndian(debugSlot.windSpeedMpsTenths)
+            packet.appendLittleEndian(debugSlot.windGustMpsTenths)
             packet.append(debugSlot.precipitationProbabilityPercent)
             packet.append(debugSlot.precipitationKind.rawValue)
             packet.append(debugSlot.precipitationIntensity.rawValue)
-            packet.append(debugSlot.presenceFlags)
-            packet.appendLittleEndian(debugSlot.visibilityDam)
+            packet.append(debugSlot.reserved0)
+            packet.appendLittleEndian(debugSlot.visibilityM)
             packet.appendLittleEndian(debugSlot.hazardFlags.rawValue)
-            packet.appendLittleEndian(UInt16(0))
 
             return debugSlot
         }
@@ -218,15 +229,17 @@ enum RegionalSnapshotBuilder {
         slot: OnePointWeatherSlot?
     ) -> RegionalSnapshotSlotPacketDebug {
         var notes: [String] = []
-        var presenceFlags: UInt8 = 0
 
         if let slot {
             notes.append("weatherSummary=\(slot.weatherSummary ?? "nil")")
             notes.append("weatherRule=\(slot.weatherSelectionNote)")
             notes.append("hazardSummary=\(slot.hazardSummary ?? "nil")")
             notes.append("hazardRule=\(slot.hazardSelectionNote)")
+        } else {
+            notes.append("slot missing/offshore -> slot_offset_min encoded and all remaining fields zeroed per provisional convention")
         }
 
+        let slotOffsetMin = UInt16(offsetMinutes)
         let temperatureDeciC = quantizeSignedTenths(
             slot?.temperatureC,
             min: Int16.min,
@@ -236,33 +249,22 @@ enum RegionalSnapshotBuilder {
             offsetMinutes: offsetMinutes,
             notes: &notes
         )
-        if slot?.temperatureC != nil {
-            presenceFlags |= 1 << 0
-        }
 
-        let windSpeedDeciKmh = quantizeUnsignedTenths(
+        let windSpeedMpsTenths = quantizeWindMpsTenths(
             slot?.windSpeedKmh,
-            maxValue: UInt16.max,
             fieldName: "windSpeed",
             anchorLabel: anchorLabel,
             offsetMinutes: offsetMinutes,
             notes: &notes
         )
-        if slot?.windSpeedKmh != nil {
-            presenceFlags |= 1 << 1
-        }
 
-        let windGustDeciKmh = quantizeUnsignedTenths(
+        let windGustMpsTenths = quantizeWindMpsTenths(
             slot?.windGustKmh,
-            maxValue: UInt16.max,
             fieldName: "windGust",
             anchorLabel: anchorLabel,
             offsetMinutes: offsetMinutes,
             notes: &notes
         )
-        if slot?.windGustKmh != nil {
-            presenceFlags |= 1 << 2
-        }
 
         let precipitationProbabilityPercent = quantizePercent(
             slot?.precipitationProbabilityPercent,
@@ -271,9 +273,6 @@ enum RegionalSnapshotBuilder {
             offsetMinutes: offsetMinutes,
             notes: &notes
         )
-        if slot?.precipitationProbabilityPercent != nil {
-            presenceFlags |= 1 << 3
-        }
 
         let precipitationKindResult = derivePrecipitationKind(
             slot: slot,
@@ -282,9 +281,6 @@ enum RegionalSnapshotBuilder {
             notes: &notes
         )
         let precipitationKind = precipitationKindResult.kind
-        if precipitationKindResult.isPresent {
-            presenceFlags |= 1 << 4
-        }
 
         let precipitationIntensityResult = derivePrecipitationIntensity(
             slot: slot,
@@ -293,19 +289,14 @@ enum RegionalSnapshotBuilder {
             notes: &notes
         )
         let precipitationIntensity = precipitationIntensityResult.intensity
-        if precipitationIntensityResult.isPresent {
-            presenceFlags |= 1 << 5
-        }
+        let reserved0: UInt8 = 0
 
-        let visibilityDam = quantizeVisibilityDam(
+        let visibilityM = quantizeVisibilityMeters(
             slot?.visibilityMeters,
             anchorLabel: anchorLabel,
             offsetMinutes: offsetMinutes,
             notes: &notes
         )
-        if slot?.visibilityMeters != nil {
-            presenceFlags |= 1 << 6
-        }
 
         let hazardFlagsResult = deriveHazardFlags(
             slot: slot,
@@ -315,38 +306,36 @@ enum RegionalSnapshotBuilder {
             notes: &notes
         )
         let hazardFlags = hazardFlagsResult.flags
-        if hazardFlagsResult.isPresent {
-            presenceFlags |= 1 << 7
-        }
 
         print(
             """
             RegionalSnapshotBuilder: packet-ready slot \
             anchor=\(anchorLabel) \
             offsetMinutes=\(offsetMinutes) \
+            slotOffsetMin=\(slotOffsetMin) \
             temperatureDeciC=\(temperatureDeciC) \
-            windSpeedDeciKmh=\(windSpeedDeciKmh) \
-            windGustDeciKmh=\(windGustDeciKmh) \
+            windSpeedMpsTenths=\(windSpeedMpsTenths) \
+            windGustMpsTenths=\(windGustMpsTenths) \
             precipitationProbabilityPercent=\(precipitationProbabilityPercent) \
             precipitationKind=\(precipitationKind.description) \
             precipitationIntensity=\(precipitationIntensity.description) \
-            visibilityDam=\(visibilityDam) \
-            hazardFlags=\(hazardFlags.description) \
-            presenceFlags=0x\(String(format: "%02X", presenceFlags))
+            visibilityM=\(visibilityM) \
+            hazardFlags=\(hazardFlags.description)
             """
         )
 
         return RegionalSnapshotSlotPacketDebug(
             offsetMinutes: offsetMinutes,
+            slotOffsetMin: slotOffsetMin,
             temperatureDeciC: temperatureDeciC,
-            windSpeedDeciKmh: windSpeedDeciKmh,
-            windGustDeciKmh: windGustDeciKmh,
+            windSpeedMpsTenths: windSpeedMpsTenths,
+            windGustMpsTenths: windGustMpsTenths,
             precipitationProbabilityPercent: precipitationProbabilityPercent,
             precipitationKind: precipitationKind,
             precipitationIntensity: precipitationIntensity,
-            visibilityDam: visibilityDam,
+            reserved0: reserved0,
+            visibilityM: visibilityM,
             hazardFlags: hazardFlags,
-            presenceFlags: presenceFlags,
             quantizationNotes: notes
         )
     }
@@ -394,7 +383,7 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> (kind: PrecipitationKind, isPresent: Bool) {
         guard let slot else {
-            notes.append("precipitationKind missing -> encoded noneOrUnknown with presence bit cleared")
+            notes.append("precipitationKind missing/offshore -> encoded noneOrUnknown in packet")
             return (.noneOrUnknown, false)
         }
 
@@ -403,7 +392,7 @@ enum RegionalSnapshotBuilder {
             .joined(separator: " | ")
 
         guard !summary.isEmpty else {
-            notes.append("precipitationKind unavailable -> encoded noneOrUnknown with presence bit cleared")
+            notes.append("precipitationKind unavailable -> encoded noneOrUnknown in packet")
             return (.noneOrUnknown, false)
         }
 
@@ -420,7 +409,7 @@ enum RegionalSnapshotBuilder {
         if isPresent {
             notes.append("precipitationKind derived from slot weather/hazard text summary")
         } else {
-            notes.append("precipitationKind text had no mappable precipitation kind -> encoded noneOrUnknown with presence bit cleared")
+            notes.append("precipitationKind text had no mappable precipitation kind -> encoded noneOrUnknown in packet")
         }
 
         print("RegionalSnapshotBuilder: precip kind anchor=\(anchorLabel) offsetMinutes=\(offsetMinutes) kind=\(prioritized.description) summary=\(summary)")
@@ -434,7 +423,7 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> (intensity: PrecipitationIntensity, isPresent: Bool) {
         guard let slot, let weatherSummary = slot.weatherSummary?.lowercased(), !weatherSummary.isEmpty else {
-            notes.append("precipitationIntensity unavailable -> encoded noneOrUnknown with presence bit cleared")
+            notes.append("precipitationIntensity unavailable -> encoded noneOrUnknown in packet")
             return (.noneOrUnknown, false)
         }
 
@@ -453,7 +442,7 @@ enum RegionalSnapshotBuilder {
         if isPresent {
             notes.append("precipitationIntensity derived from NOAA weather intensity text")
         } else {
-            notes.append("precipitationIntensity not derivable from NOAA weather text -> encoded noneOrUnknown with presence bit cleared")
+            notes.append("precipitationIntensity not derivable from NOAA weather text -> encoded noneOrUnknown in packet")
         }
 
         print("RegionalSnapshotBuilder: precip intensity anchor=\(anchorLabel) offsetMinutes=\(offsetMinutes) intensity=\(intensity.description) weatherSummary=\(weatherSummary)")
@@ -468,7 +457,7 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> (flags: HazardFlags, isPresent: Bool) {
         guard let slot else {
-            notes.append("hazardFlags unavailable -> encoded 0 with presence bit cleared")
+            notes.append("hazardFlags unavailable/offshore -> encoded 0 in packet")
             return ([], false)
         }
 
@@ -518,7 +507,7 @@ enum RegionalSnapshotBuilder {
         if hadEvidence {
             notes.append("hazardFlags derived conservatively from slot weather/hazard text plus metric thresholds")
         } else {
-            notes.append("hazardFlags unavailable -> encoded 0 with presence bit cleared")
+            notes.append("hazardFlags unavailable -> encoded 0 in packet")
         }
 
         print("RegionalSnapshotBuilder: hazard flags anchor=\(anchorLabel) offsetMinutes=\(offsetMinutes) flags=\(flags.description) summary=\(combinedSummary)")
@@ -574,7 +563,7 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> Int16 {
         guard let value else {
-            notes.append("\(fieldName) missing -> encoded 0 with presence bit cleared")
+            notes.append("\(fieldName) missing/offshore -> encoded 0 in packet")
             return 0
         }
 
@@ -588,26 +577,27 @@ enum RegionalSnapshotBuilder {
         return Int16(clamped)
     }
 
-    private static func quantizeUnsignedTenths(
+    private static func quantizeWindMpsTenths(
         _ value: Double?,
-        maxValue: UInt16,
         fieldName: String,
         anchorLabel: String,
         offsetMinutes: Int,
         notes: inout [String]
     ) -> UInt16 {
         guard let value else {
-            notes.append("\(fieldName) missing -> encoded 0 with presence bit cleared")
+            notes.append("\(fieldName) missing/offshore -> encoded 0 in packet")
             return 0
         }
 
-        let raw = Int((Swift.max(0, value) * 10).rounded())
-        let clamped = Swift.max(0, Swift.min(Int(maxValue), raw))
+        let metersPerSecond = value / 3.6
+        let raw = Int((Swift.max(0, metersPerSecond) * 10).rounded())
+        let clamped = Swift.max(0, Swift.min(Int(UInt16.max), raw))
         if clamped != raw {
             print("RegionalSnapshotBuilder: \(fieldName) clamped anchor=\(anchorLabel) offsetMinutes=\(offsetMinutes) raw=\(raw) clamped=\(clamped)")
             notes.append("\(fieldName) clamped from \(raw) to \(clamped)")
         }
 
+        notes.append("\(fieldName) encoded as tenths of m/s from internal km/h")
         return UInt16(clamped)
     }
 
@@ -619,7 +609,7 @@ enum RegionalSnapshotBuilder {
         notes: inout [String]
     ) -> UInt8 {
         guard let value else {
-            notes.append("\(fieldName) missing -> encoded 0 with presence bit cleared")
+            notes.append("\(fieldName) missing/offshore -> encoded 0 in packet")
             return 0
         }
 
@@ -633,24 +623,25 @@ enum RegionalSnapshotBuilder {
         return UInt8(clamped)
     }
 
-    private static func quantizeVisibilityDam(
+    private static func quantizeVisibilityMeters(
         _ value: Double?,
         anchorLabel: String,
         offsetMinutes: Int,
         notes: inout [String]
     ) -> UInt16 {
         guard let value else {
-            notes.append("visibility missing -> encoded 0 with presence bit cleared")
+            notes.append("visibility missing/offshore -> encoded 0 in packet")
             return 0
         }
 
-        let raw = Int((max(0, value) / 10).rounded())
+        let raw = Int(Swift.max(0, value).rounded())
         let clamped = Swift.max(0, Swift.min(Int(UInt16.max), raw))
         if clamped != raw {
             print("RegionalSnapshotBuilder: visibility clamped anchor=\(anchorLabel) offsetMinutes=\(offsetMinutes) raw=\(raw) clamped=\(clamped)")
             notes.append("visibility clamped from \(raw) to \(clamped)")
         }
 
+        notes.append("visibility encoded as whole meters")
         return UInt16(clamped)
     }
 }

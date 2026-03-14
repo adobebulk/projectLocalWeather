@@ -128,7 +128,7 @@ struct WeatherDebugView: View {
                         Text("Coordinate: \(anchor.anchorCoordinateText)")
 
                         ForEach(anchor.slots) { slot in
-                            Text("Slot +\(slot.offsetMinutes)m tempDeciC=\(slot.temperatureDeciC) windDeciKmh=\(slot.windSpeedDeciKmh) gustDeciKmh=\(slot.windGustDeciKmh) pop=\(slot.precipitationProbabilityPercent) kind=\(slot.precipitationKind.description) intensity=\(slot.precipitationIntensity.description) visibilityDam=\(slot.visibilityDam) hazardFlags=\(slot.hazardFlags.description) presence=0x\(String(format: "%02X", slot.presenceFlags))")
+                            Text("Slot +\(slot.offsetMinutes)m slotOffsetMin=\(slot.slotOffsetMin) airTempCTenths=\(slot.temperatureDeciC) windSpeedMpsTenths=\(slot.windSpeedMpsTenths) windGustMpsTenths=\(slot.windGustMpsTenths) precipProbPct=\(slot.precipitationProbabilityPercent) precipKind=\(slot.precipitationKind.description) precipIntensity=\(slot.precipitationIntensity.description) reserved0=\(slot.reserved0) visibilityM=\(slot.visibilityM) hazardFlags=\(slot.hazardFlags.description)")
                             ForEach(slot.quantizationNotes, id: \.self) { note in
                                 Text("Note: \(note)")
                             }

@@ -484,7 +484,7 @@
       },
       {
         "comment": "",
-        "key": "Slot +%lldm tempDeciC=%d windDeciKmh=%u gustDeciKmh=%u pop=%u kind=%@ intensity=%@ visibilityDam=%u hazardFlags=%@ presence=0x%@",
+        "key": "Slot +%lldm slotOffsetMin=%u airTempCTenths=%d windSpeedMpsTenths=%u windGustMpsTenths=%u precipProbPct=%u precipKind=%@ precipIntensity=%@ reserved0=%u visibilityM=%u hazardFlags=%@",
         "location": {
           "startingColumn": 34,
           "startingLine": 131
