@@ -28,8 +28,17 @@ void updateRuntimeDisplay(const interpolation::LocalEstimate& estimate, Stream& 
     return;
   }
 
-  display_formatter::logDecision(estimate, serial);
-  const display_formatter::DisplayLines lines = display_formatter::formatEstimate(estimate);
+  const device_state::DeviceState* state = device_state::state();
+  uint32_t weather_age_minutes = 0;
+  if (state->has_weather && state->estimate_timestamp > state->weather_timestamp) {
+    weather_age_minutes = (state->estimate_timestamp - state->weather_timestamp) / 60;
+  }
+  display_formatter::DisplayContext display_context = {};
+  display_context.weather_age_minutes = weather_age_minutes;
+
+  display_formatter::logDecision(estimate, display_context, serial);
+  const display_formatter::DisplayLines lines =
+      display_formatter::formatEstimate(estimate, display_context);
   serial.println("DISPLAY: runtime update start");
   serial.print("DISPLAY: line1=");
   serial.println(lines.line1);

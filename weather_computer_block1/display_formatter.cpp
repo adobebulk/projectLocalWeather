@@ -6,6 +6,8 @@
 
 namespace {
 
+constexpr uint32_t kStaleThresholdMinutes = 300;
+
 void fitToDisplay(const char* source, char* destination) {
   size_t index = 0;
   while (source[index] != '\0' && index < 16) {
@@ -223,27 +225,41 @@ const char* interpretationText(const interpolation::LocalEstimate& estimate) {
   return "CLEAR";
 }
 
-void buildLine2(const interpolation::LocalEstimate& estimate, char* out_line) {
+const char* resolvedInterpretation(const interpolation::LocalEstimate& estimate,
+                                   const display_formatter::DisplayContext& context) {
+  if (context.weather_age_minutes > kStaleThresholdMinutes) {
+    return "DATA STALE";
+  }
+  return interpretationText(estimate);
+}
+
+void buildLine2(const interpolation::LocalEstimate& estimate,
+                const display_formatter::DisplayContext& context, char* out_line) {
   char confidence[8];
   char interpretation[17];
-  snprintf(interpretation, sizeof(interpretation), "%s", interpretationText(estimate));
+  snprintf(interpretation, sizeof(interpretation), "%s", resolvedInterpretation(estimate, context));
 
-  uint8_t display_confidence = estimate.confidence_score;
-  if (strcmp(interpretation, "UNKNOWN") == 0 && display_confidence > 79) {
-    // Display-policy guard: unknown top-level interpretation should not
-    // present near-certain confidence.
-    display_confidence = 79;
+  const bool stale = strcmp(interpretation, "DATA STALE") == 0;
+  const bool unknown = strcmp(interpretation, "UNKNOWN") == 0;
+  const bool suppress_confidence = stale || unknown;
+
+  if (!suppress_confidence) {
+    snprintf(confidence, sizeof(confidence), "C%u%%",
+             static_cast<unsigned>(estimate.confidence_score));
   }
-  snprintf(confidence, sizeof(confidence), "C%u%%", static_cast<unsigned>(display_confidence));
 
-  const size_t confidence_length = strlen(confidence);
-  const size_t max_interpretation_length = 16 - 1 - confidence_length;
+  const size_t confidence_length = suppress_confidence ? 0 : strlen(confidence);
+  const size_t max_interpretation_length = suppress_confidence ? 16 : (16 - 1 - confidence_length);
   if (strlen(interpretation) > max_interpretation_length) {
     interpretation[max_interpretation_length] = '\0';
   }
 
   char candidate[24];
-  snprintf(candidate, sizeof(candidate), "%s %s", interpretation, confidence);
+  if (suppress_confidence) {
+    snprintf(candidate, sizeof(candidate), "%s", interpretation);
+  } else {
+    snprintf(candidate, sizeof(candidate), "%s %s", interpretation, confidence);
+  }
   fitToDisplay(candidate, out_line);
 }
 
@@ -251,14 +267,16 @@ void buildLine2(const interpolation::LocalEstimate& estimate, char* out_line) {
 
 namespace display_formatter {
 
-DisplayLines formatEstimate(const interpolation::LocalEstimate& estimate) {
+DisplayLines formatEstimate(const interpolation::LocalEstimate& estimate,
+                           const DisplayContext& context) {
   DisplayLines lines = {};
   buildLine1(estimate, lines.line1);
-  buildLine2(estimate, lines.line2);
+  buildLine2(estimate, context, lines.line2);
   return lines;
 }
 
-void logDecision(const interpolation::LocalEstimate& estimate, Stream& serial) {
+void logDecision(const interpolation::LocalEstimate& estimate, const DisplayContext& context,
+                 Stream& serial) {
   const bool vis_missing = visibilityMissing(estimate.visibility_m);
   serial.print("DISPLAY: decision visibility_m=");
   serial.print(estimate.visibility_m);
@@ -280,17 +298,43 @@ void logDecision(const interpolation::LocalEstimate& estimate, Stream& serial) {
   serial.print(" hazard=0x");
   serial.println(estimate.hazard_flags, HEX);
 
-  const char* interpretation = interpretationText(estimate);
-  uint8_t display_confidence = estimate.confidence_score;
-  if (strcmp(interpretation, "UNKNOWN") == 0 && display_confidence > 79) {
-    display_confidence = 79;
-  }
+  const bool stale = context.weather_age_minutes > kStaleThresholdMinutes;
+  serial.print("DISPLAY: decision weather_age_min=");
+  serial.print(context.weather_age_minutes);
+  serial.print(" stale_threshold_min=");
+  serial.print(kStaleThresholdMinutes);
+  serial.print(" stale=");
+  serial.println(stale ? 1 : 0);
+
+  const char* interpretation = resolvedInterpretation(estimate, context);
+  const bool suppress_unknown = strcmp(interpretation, "UNKNOWN") == 0;
+  const bool suppress_stale = strcmp(interpretation, "DATA STALE") == 0;
   serial.print("DISPLAY: decision interpretation=");
   serial.print(interpretation);
+  serial.print(" precedence=");
+  if (suppress_stale) {
+    serial.print("DATA_STALE");
+  } else if (strcmp(interpretation, "THUNDER") == 0 || strcmp(interpretation, "ICE") == 0 ||
+             strcmp(interpretation, "SNOW") == 0 || strcmp(interpretation, "RAIN") == 0 ||
+             strcmp(interpretation, "FOG") == 0 || strcmp(interpretation, "SMOKE") == 0 ||
+             strcmp(interpretation, "HAZE") == 0 || strcmp(interpretation, "MIXED") == 0 ||
+             strcmp(interpretation, "WINDY") == 0) {
+    serial.print("WEATHER_SIGNAL");
+  } else if (suppress_unknown) {
+    serial.print("UNKNOWN");
+  } else {
+    serial.print("CLEAR");
+  }
   serial.print(" confidence_raw=");
   serial.print(estimate.confidence_score);
-  serial.print(" confidence_shown=");
-  serial.println(display_confidence);
+  serial.print(" confidence_suppressed=");
+  if (suppress_stale) {
+    serial.println("stale");
+  } else if (suppress_unknown) {
+    serial.println("unknown");
+  } else {
+    serial.println("none");
+  }
 }
 
 }  // namespace display_formatter

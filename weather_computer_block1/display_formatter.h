@@ -21,8 +21,14 @@ struct DisplayLines {
   char line2[17];
 };
 
-DisplayLines formatEstimate(const interpolation::LocalEstimate& estimate);
-void logDecision(const interpolation::LocalEstimate& estimate, Stream& serial);
+struct DisplayContext {
+  uint32_t weather_age_minutes;
+};
+
+DisplayLines formatEstimate(const interpolation::LocalEstimate& estimate,
+                           const DisplayContext& context);
+void logDecision(const interpolation::LocalEstimate& estimate, const DisplayContext& context,
+                 Stream& serial);
 
 }  // namespace display_formatter
 
