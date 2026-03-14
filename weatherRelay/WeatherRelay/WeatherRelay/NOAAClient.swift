@@ -227,9 +227,24 @@ final class NOAAClient {
         let rawWindSpeed = Self.selectQuantitativeValue(fieldName: "windSpeed", properties: forecastProperties, now: fetchedAt)
         let rawWindGust = Self.selectQuantitativeValue(fieldName: "windGust", properties: forecastProperties, now: fetchedAt)
         let rawProbabilityOfPrecipitation = Self.selectQuantitativeValue(fieldName: "probabilityOfPrecipitation", properties: forecastProperties, now: fetchedAt)
-        let rawVisibility = Self.selectQuantitativeValue(fieldName: "visibility", properties: forecastProperties, now: fetchedAt)
-        let rawWeather = Self.selectTextValue(fieldName: "weather", properties: forecastProperties, now: fetchedAt)
-        let rawHazards = Self.selectTextValue(fieldName: "hazards", properties: forecastProperties, now: fetchedAt)
+        let rawVisibility = Self.selectQuantitativeValue(
+            fieldName: "visibility",
+            properties: forecastProperties,
+            now: fetchedAt,
+            logPrefix: logPrefix
+        )
+        let rawWeather = Self.selectTextValue(
+            fieldName: "weather",
+            properties: forecastProperties,
+            now: fetchedAt,
+            logPrefix: logPrefix
+        )
+        let rawHazards = Self.selectTextValue(
+            fieldName: "hazards",
+            properties: forecastProperties,
+            now: fetchedAt,
+            logPrefix: logPrefix
+        )
 
         let snapshot = OnePointWeatherSnapshot(
             temperatureC: Self.convertTemperatureToCelsius(rawTemperature),
@@ -351,25 +366,56 @@ final class NOAAClient {
     private static func selectQuantitativeValue(
         fieldName: String,
         properties: [String: Any],
-        now: Date
+        now: Date,
+        logPrefix: String? = nil
     ) -> NOAASelectedQuantitativeValue? {
         guard
             let field = properties[fieldName] as? [String: Any],
             let values = field["values"] as? [[String: Any]]
         else {
+            if let logPrefix {
+                print("\(logPrefix): quantitative source missing fieldPath=properties.\(fieldName).values")
+            }
             return nil
         }
 
         let unitCode = field["uom"] as? String
         guard let selected = selectBestSeriesEntry(values: values, now: now) else {
+            if let logPrefix {
+                print("\(logPrefix): quantitative source has no selectable entry fieldPath=properties.\(fieldName).values")
+            }
             return nil
+        }
+
+        if let logPrefix {
+            let rawValueDescription = debugJSONString(selected.value["value"])
+            print(
+                """
+                \(logPrefix): quantitative source selected \
+                fieldPath=properties.\(fieldName).values[].value \
+                validTime=\(selected.validTime) \
+                rawValue=\(rawValueDescription) \
+                unitCode=\(unitCode ?? "nil")
+                """
+            )
+        }
+
+        let selectedNumericValue = Self.doubleValue(from: selected.value["value"])
+        if let logPrefix, selectedNumericValue == nil {
+            print(
+                """
+                \(logPrefix): quantitative source selected but numeric value unavailable \
+                fieldPath=properties.\(fieldName).values[].value \
+                validTime=\(selected.validTime)
+                """
+            )
         }
 
         return NOAASelectedQuantitativeValue(
             fieldName: fieldName,
             validTime: selected.validTime,
             unitCode: unitCode,
-            value: Self.doubleValue(from: selected.value["value"])
+            value: selectedNumericValue
         )
     }
 
@@ -421,22 +467,64 @@ final class NOAAClient {
     private static func selectTextValue(
         fieldName: String,
         properties: [String: Any],
-        now: Date
+        now: Date,
+        logPrefix: String? = nil
     ) -> NOAASelectedTextValue? {
         guard
             let field = properties[fieldName] as? [String: Any],
             let values = field["values"] as? [[String: Any]]
         else {
+            if let logPrefix {
+                print("\(logPrefix): text source missing fieldPath=properties.\(fieldName).values")
+            }
             return nil
         }
 
         guard let selected = selectBestSeriesEntry(values: values, now: now) else {
+            if let logPrefix {
+                print("\(logPrefix): text source has no selectable entry fieldPath=properties.\(fieldName).values")
+            }
             return nil
         }
 
-        let summary = summarizeTextValue(selected.value["value"])
+        if let logPrefix {
+            print(
+                """
+                \(logPrefix): text source selected \
+                fieldPath=properties.\(fieldName).values[].value \
+                validTime=\(selected.validTime) \
+                rawValue=\(debugJSONString(selected.value["value"]))
+                """
+            )
+        }
+
+        let summary = summarizeTextValue(
+            selected.value["value"],
+            context: "properties.\(fieldName).values[].value validTime=\(selected.validTime)"
+        )
         guard !summary.isEmpty else {
+            if let logPrefix {
+                print(
+                    """
+                    \(logPrefix): text source summary suppressed \
+                    fieldPath=properties.\(fieldName).values[].value \
+                    validTime=\(selected.validTime) \
+                    reason=metadata-only-or-non-semantic
+                    """
+                )
+            }
             return nil
+        }
+
+        if let logPrefix {
+            print(
+                """
+                \(logPrefix): text summary accepted \
+                field=\(fieldName) \
+                validTime=\(selected.validTime) \
+                summary=\(summary)
+                """
+            )
         }
 
         return NOAASelectedTextValue(
@@ -735,7 +823,10 @@ final class NOAAClient {
                 return nil
             }
 
-            let summary = summarizeTextValue(item["value"])
+            let summary = summarizeTextValue(
+                item["value"],
+                context: "properties.\(fieldName).values[].value validTime=\(validTime)"
+            )
             guard !summary.isEmpty else {
                 return nil
             }
@@ -846,7 +937,7 @@ final class NOAAClient {
         }
     }
 
-    private static func summarizeTextValue(_ rawValue: Any?) -> String {
+    private static func summarizeTextValue(_ rawValue: Any?, context: String? = nil) -> String {
         switch rawValue {
         case let value as String:
             return value
@@ -857,10 +948,20 @@ final class NOAAClient {
         case let value as [[String: Any]]:
             return value.map { summarizeWeatherCondition($0) }.filter { !$0.isEmpty }.joined(separator: " | ")
         case let value as [Any]:
-            return value.map { summarizeTextValue($0) }.filter { !$0.isEmpty }.joined(separator: ", ")
+            return value.map { summarizeTextValue($0, context: context) }.filter { !$0.isEmpty }.joined(separator: ", ")
         case let value as [String: Any]:
+            if isMetadataOnlyTextDictionary(value) {
+                print(
+                    """
+                    NOAAClient: text summary suppressed metadata-only dictionary \
+                    context=\(context ?? "unknown") \
+                    keys=\(value.keys.sorted().joined(separator: ","))
+                    """
+                )
+                return ""
+            }
             let parts = value.keys.sorted().compactMap { key -> String? in
-                let text = summarizeTextValue(value[key])
+                let text = summarizeTextValue(value[key], context: context)
                 return text.isEmpty ? nil : "\(key)=\(text)"
             }
             return parts.joined(separator: ", ")
@@ -885,9 +986,17 @@ final class NOAAClient {
         }
 
         if let visibility = value["visibility"] as? [String: Any] {
-            let visibilityText = summarizeTextValue(visibility)
+            let visibilityText = summarizeVisibilityCondition(visibility)
             if !visibilityText.isEmpty {
                 parts.append("visibility=\(visibilityText)")
+            } else if !visibility.isEmpty {
+                print(
+                    """
+                    NOAAClient: weatherSummary visibility fragment suppressed \
+                    reason=metadata-only-or-non-semantic \
+                    rawVisibilityObject=\(debugJSONString(visibility))
+                    """
+                )
             }
         }
 
@@ -947,6 +1056,54 @@ final class NOAAClient {
         default:
             return raw
         }
+    }
+
+    private static func summarizeVisibilityCondition(_ value: [String: Any]) -> String {
+        guard let rawValue = doubleValue(from: value["value"]) else {
+            return ""
+        }
+
+        if let unitCode = value["unitCode"] as? String, !unitCode.isEmpty {
+            return "value=\(formatDouble(rawValue)) \(unitCode)"
+        }
+
+        return "value=\(formatDouble(rawValue))"
+    }
+
+    private static func isMetadataOnlyTextDictionary(_ value: [String: Any]) -> Bool {
+        let keys = Set(value.keys)
+        if keys.isEmpty {
+            return true
+        }
+
+        if keys == ["unitCode"] || keys == ["uom"] {
+            return true
+        }
+
+        if keys.isSubset(of: ["unitCode", "value"]) && doubleValue(from: value["value"]) == nil {
+            return true
+        }
+
+        return false
+    }
+
+    private static func debugJSONString(_ value: Any?) -> String {
+        guard let value else {
+            return "nil"
+        }
+
+        if !JSONSerialization.isValidJSONObject(value) {
+            return String(describing: value)
+        }
+
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+            let text = String(data: data, encoding: .utf8)
+        else {
+            return String(describing: value)
+        }
+
+        return text
     }
 
     private static func doubleValue(from anyValue: Any?) -> Double? {
