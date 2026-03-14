@@ -1,0 +1,32 @@
+{
+  "source": "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/WeatherRelay/WeatherRelay/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Weather Relay",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 15
+        }
+      },
+      {
+        "comment": "",
+        "key": "Service discovered",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 23
+        }
+      },
+      {
+        "comment": "",
+        "key": "RX/TX characteristics discovered",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 28
+        }
+      }
+    ]
+  },
+  "version": 1
+}
