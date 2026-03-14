@@ -15,7 +15,7 @@
         "key": "Service discovered",
         "location": {
           "startingColumn": 22,
-          "startingLine": 32
+          "startingLine": 33
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "RX/TX characteristics discovered",
         "location": {
           "startingColumn": 22,
-          "startingLine": 37
+          "startingLine": 38
         }
       },
       {
@@ -31,7 +31,15 @@
         "key": "Send Test Payload",
         "location": {
           "startingColumn": 20,
-          "startingLine": 41
+          "startingLine": 42
+        }
+      },
+      {
+        "comment": "",
+        "key": "Send Position Packet",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 48
         }
       },
       {
@@ -64,6 +72,14 @@
         "location": {
           "startingColumn": 22,
           "startingLine": 26
+        }
+      },
+      {
+        "comment": "",
+        "key": "Last sent packet: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 27
         }
       }
     ]

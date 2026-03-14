@@ -24,6 +24,7 @@ struct ContentView: View {
                 Text("Last peripheral name: \(bleManager.lastDiscoveredPeripheralName)")
                 Text("Last advertised name: \(bleManager.lastAdvertisedLocalName)")
                 Text("Found target: \(bleManager.didFindDevice ? "Yes" : "No")")
+                Text("Last sent packet: \(bleManager.lastSentPacketHex)")
             }
             .font(.subheadline)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -42,6 +43,12 @@ struct ContentView: View {
                 bleManager.sendTestPayload()
             }
             .buttonStyle(.borderedProminent)
+            .disabled(!bleManager.didDiscoverCharacteristics)
+
+            Button("Send Position Packet") {
+                bleManager.sendPositionPacket()
+            }
+            .buttonStyle(.bordered)
             .disabled(!bleManager.didDiscoverCharacteristics)
         }
         .padding()

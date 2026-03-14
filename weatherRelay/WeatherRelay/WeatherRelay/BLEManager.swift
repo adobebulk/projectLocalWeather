@@ -26,6 +26,7 @@ final class BLEManager: NSObject, ObservableObject {
     @Published var lastAdvertisedLocalName = "-"
     @Published var lastDiscoveredRSSI = "-"
     @Published var lastDiscoveredServiceUUIDs = "-"
+    @Published var lastSentPacketHex = "-"
 
     var statusText: String {
         if !bluetoothPoweredOn {
@@ -55,6 +56,7 @@ final class BLEManager: NSObject, ObservableObject {
     private var targetPeripheral: CBPeripheral?
     private var rxCharacteristic: CBCharacteristic?
     private var txCharacteristic: CBCharacteristic?
+    private var nextSequenceNumber: UInt32 = 202
 
     override init() {
         super.init()
@@ -95,28 +97,50 @@ final class BLEManager: NSObject, ObservableObject {
         lastAdvertisedLocalName = "-"
         lastDiscoveredRSSI = "-"
         lastDiscoveredServiceUUIDs = "-"
+        lastSentPacketHex = "-"
         targetPeripheral = nil
         rxCharacteristic = nil
         txCharacteristic = nil
     }
 
     func sendTestPayload() {
+        let payload = Data([0x41, 0x42, 0x43])
+        writeToRX(payload, label: "test payload")
+    }
+
+    func sendPositionPacket() {
+        let values = PacketBuilder.PositionValues(
+            sequence: nextSequenceNumber,
+            timestampUnix: 1_700_001_800,
+            latE5: 3_405_223,
+            lonE5: -11_824_368,
+            accuracyM: 8,
+            fixTimestampUnix: 1_700_001_800
+        )
+        nextSequenceNumber += 1
+
+        let packet = PacketBuilder.makePositionUpdateV1(values: values)
+        lastSentPacketHex = packet.hexString
+        print("BLEManager: built PositionUpdateV1 packet hex=\(packet.hexString)")
+        writeToRX(packet, label: "PositionUpdateV1 packet")
+    }
+
+    private func writeToRX(_ payload: Data, label: String) {
         guard let peripheral = targetPeripheral else {
-            print("BLEManager: test write skipped - no connected peripheral")
+            print("BLEManager: \(label) write skipped - no connected peripheral")
             return
         }
 
         guard let rxCharacteristic else {
-            print("BLEManager: test write skipped - RX characteristic not available")
+            print("BLEManager: \(label) write skipped - RX characteristic not available")
             return
         }
 
-        let payload = Data([0x41, 0x42, 0x43])
         let writeType: CBCharacteristicWriteType =
             rxCharacteristic.properties.contains(.write) ? .withResponse : .withoutResponse
         let writeTypeDescription = writeType == .withResponse ? "withResponse" : "withoutResponse"
 
-        print("BLEManager: writing test payload hex=\(payload.hexString) using \(writeTypeDescription)")
+        print("BLEManager: writing \(label) hex=\(payload.hexString) using \(writeTypeDescription)")
         peripheral.writeValue(payload, for: rxCharacteristic, type: writeType)
     }
 }
