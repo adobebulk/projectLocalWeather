@@ -96,16 +96,49 @@ struct ContentView: View {
             }
         }
         .padding()
+        .onAppear {
+            print("ContentView: appeared scenePhase=\(scenePhase.description)")
+        }
         .onChange(of: bleManager.didDiscoverCharacteristics) { _, _ in
+            print(
+                """
+                ContentView: BLE readiness changed \
+                didDiscoverCharacteristics=\(bleManager.didDiscoverCharacteristics) \
+                scenePhase=\(scenePhase.description)
+                """
+            )
             bleManager.considerPositionSendIfDue(locationFix: locationManager.currentFix, trigger: "ble-ready")
         }
         .onChange(of: locationManager.currentFix?.timestamp) { _, _ in
+            print(
+                """
+                ContentView: location fix changed \
+                hasFix=\(locationManager.currentFix != nil) \
+                scenePhase=\(scenePhase.description)
+                """
+            )
             bleManager.considerPositionSendIfDue(locationFix: locationManager.currentFix, trigger: "location-update")
         }
         .onChange(of: scenePhase) { _, newPhase in
+            print("ContentView: scenePhase changed to \(newPhase.description)")
             if newPhase == .active {
                 bleManager.considerPositionSendIfDue(locationFix: locationManager.currentFix, trigger: "scene-active")
             }
+        }
+    }
+}
+
+private extension ScenePhase {
+    var description: String {
+        switch self {
+        case .active:
+            return "active"
+        case .inactive:
+            return "inactive"
+        case .background:
+            return "background"
+        @unknown default:
+            return "unknownDefault"
         }
     }
 }

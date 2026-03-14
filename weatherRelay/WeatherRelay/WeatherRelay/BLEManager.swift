@@ -105,10 +105,12 @@ final class BLEManager: NSObject, ObservableObject {
         }
 
         guard !isScanning else {
+            print("BLEManager: scan skipped - already scanning")
             return
         }
 
         guard !isConnected else {
+            print("BLEManager: scan skipped - already connected")
             return
         }
 
@@ -122,6 +124,15 @@ final class BLEManager: NSObject, ObservableObject {
     }
 
     private func resetDiscoveryStateForNewScan() {
+        if let pendingPositionSequence {
+            print(
+                """
+                BLEManager: clearing pending position state for new scan \
+                sequence=\(pendingPositionSequence) \
+                trigger=\(pendingPositionTrigger ?? "unknown")
+                """
+            )
+        }
         didFindDevice = false
         isConnected = false
         didDiscoverService = false
@@ -145,6 +156,28 @@ final class BLEManager: NSObject, ObservableObject {
     }
 
     func considerPositionSendIfDue(locationFix: LocationManager.LocationFix?, trigger: String) {
+        let nowUnix = Int(Date().timeIntervalSince1970)
+        let fixAgeDescription: String
+        if let locationFix {
+            fixAgeDescription = String(Int(Date().timeIntervalSince(locationFix.timestamp)))
+        } else {
+            fixAgeDescription = "none"
+        }
+        let lastSuccessfulDescription = lastSuccessfulPositionSendDate.map { String(Int($0.timeIntervalSince1970)) } ?? "none"
+
+        print(
+            """
+            BLEManager: send-if-due evaluating \
+            trigger=\(trigger) \
+            nowUnix=\(nowUnix) \
+            bleReady=\(isConnected && didDiscoverCharacteristics) \
+            hasFix=\(locationFix != nil) \
+            fixAgeSeconds=\(fixAgeDescription) \
+            pendingSequence=\(pendingPositionSequence.map(String.init) ?? "none") \
+            lastSuccessfulSendUnix=\(lastSuccessfulDescription)
+            """
+        )
+
         guard isConnected && didDiscoverCharacteristics else {
             print("BLEManager: send-if-due skipped - BLE not ready trigger=\(trigger)")
             return
@@ -266,13 +299,24 @@ extension BLEManager: CBCentralManagerDelegate {
         }) ?? restoredPeripherals.first {
             targetPeripheral = restoredPeripheral
             restoredPeripheral.delegate = self
-            print("BLEManager: restored peripheral name=\(restoredPeripheral.name ?? "nil") state=\(restoredPeripheral.state.description)")
+            print(
+                """
+                BLEManager: restored peripheral \
+                name=\(restoredPeripheral.name ?? "nil") \
+                id=\(restoredPeripheral.identifier) \
+                state=\(restoredPeripheral.state.description)
+                """
+            )
 
             if restoredPeripheral.state == .connected {
                 isConnected = true
                 print("BLEManager: restored connected peripheral, rediscovering services")
                 restoredPeripheral.discoverServices([Self.serviceUUID])
+            } else {
+                print("BLEManager: restored peripheral not connected, waiting for reconnect path")
             }
+        } else {
+            print("BLEManager: willRestoreState found no peripheral to restore")
         }
     }
 
@@ -333,12 +377,12 @@ extension BLEManager: CBCentralManagerDelegate {
         peripheral.delegate = self
         central.stopScan()
 
-        print("BLEManager: connecting to \(Self.targetPeripheralName)")
+        print("BLEManager: connecting to \(Self.targetPeripheralName) id=\(peripheral.identifier)")
         central.connect(peripheral, options: nil)
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        print("BLEManager: connected to \(peripheral.name ?? Self.targetPeripheralName)")
+        print("BLEManager: connected to \(peripheral.name ?? Self.targetPeripheralName) id=\(peripheral.identifier)")
         isConnected = true
         didDiscoverService = false
         didDiscoverCharacteristics = false
@@ -354,6 +398,7 @@ extension BLEManager: CBCentralManagerDelegate {
                         didFailToConnect peripheral: CBPeripheral,
                         error: Error?) {
         print("BLEManager: failed to connect to \(peripheral.name ?? Self.targetPeripheralName) error=\(error?.localizedDescription ?? "none")")
+        print("BLEManager: reconnect path - resetting discovery state and resuming scan")
         resetDiscoveryStateForNewScan()
         startScanningIfNeeded()
     }
@@ -362,6 +407,13 @@ extension BLEManager: CBCentralManagerDelegate {
                         didDisconnectPeripheral peripheral: CBPeripheral,
                         error: Error?) {
         print("BLEManager: disconnected from \(peripheral.name ?? Self.targetPeripheralName) error=\(error?.localizedDescription ?? "none")")
+        print(
+            """
+            BLEManager: reconnect path triggered after disconnect \
+            pendingSequence=\(pendingPositionSequence.map(String.init) ?? "none") \
+            pendingTrigger=\(pendingPositionTrigger ?? "none")
+            """
+        )
         isConnected = false
         didDiscoverService = false
         didDiscoverCharacteristics = false
@@ -483,11 +535,25 @@ extension BLEManager: CBPeripheralDelegate {
                 pendingPositionSequence = nil
                 pendingPositionTrigger = nil
             } else if ack.sequence == pendingPositionSequence {
-                print("BLEManager: position send not accepted status=\(ack.status) sequence=\(ack.sequence)")
+                print(
+                    """
+                    BLEManager: position send not accepted \
+                    status=\(ack.status) \
+                    sequence=\(ack.sequence) \
+                    trigger=\(pendingPositionTrigger ?? "unknown")
+                    """
+                )
                 pendingPositionSequence = nil
                 pendingPositionTrigger = nil
             } else {
-                print("BLEManager: ack sequence does not match pending position send ackSequence=\(ack.sequence) pendingSequence=\(pendingPositionSequence.map(String.init) ?? "none")")
+                print(
+                    """
+                    BLEManager: ack sequence does not match pending position send \
+                    ackSequence=\(ack.sequence) \
+                    pendingSequence=\(pendingPositionSequence.map(String.init) ?? "none") \
+                    pendingTrigger=\(pendingPositionTrigger ?? "none")
+                    """
+                )
             }
         } catch {
             print("BLEManager: AckV1 parse failed error=\(error.localizedDescription)")
@@ -502,7 +568,14 @@ extension BLEManager: CBPeripheralDelegate {
             return
         }
 
-        print("BLEManager: write completed for \(characteristic.uuid.uuidString)")
+        print(
+            """
+            BLEManager: write completed \
+            characteristic=\(characteristic.uuid.uuidString) \
+            pendingSequence=\(pendingPositionSequence.map(String.init) ?? "none") \
+            pendingTrigger=\(pendingPositionTrigger ?? "none")
+            """
+        )
     }
 }
 

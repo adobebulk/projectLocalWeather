@@ -8,6 +8,7 @@
 import Combine
 import CoreLocation
 import Foundation
+import UIKit
 
 final class LocationManager: NSObject, ObservableObject {
     struct LocationFix {
@@ -77,7 +78,13 @@ final class LocationManager: NSObject, ObservableObject {
         switch authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
             locationManager.allowsBackgroundLocationUpdates = authorizationStatus == .authorizedAlways
-            print("LocationManager: starting location updates")
+            print(
+                """
+                LocationManager: starting location updates \
+                authorization=\(authorizationStatus.description) \
+                allowsBackground=\(locationManager.allowsBackgroundLocationUpdates)
+                """
+            )
             locationManager.startUpdatingLocation()
         case .notDetermined:
             print("LocationManager: waiting for authorization")
@@ -92,7 +99,13 @@ final class LocationManager: NSObject, ObservableObject {
 extension LocationManager: CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         authorizationStatus = manager.authorizationStatus
-        print("LocationManager: authorization changed to \(authorizationStatus.description)")
+        print(
+            """
+            LocationManager: authorization changed \
+            status=\(authorizationStatus.description) \
+            allowsBackground=\(manager.allowsBackgroundLocationUpdates)
+            """
+        )
         startUpdatesIfAuthorized()
     }
 
@@ -111,6 +124,7 @@ extension LocationManager: CLLocationManagerDelegate {
         print(
             """
             LocationManager: updated location \
+            appState=\(UIApplication.shared.applicationState.description) \
             lat=\(location.coordinate.latitude) \
             lon=\(location.coordinate.longitude) \
             accuracy=\(location.horizontalAccuracy) \
@@ -137,6 +151,21 @@ private extension CLAuthorizationStatus {
             return "authorizedAlways"
         case .authorizedWhenInUse:
             return "authorizedWhenInUse"
+        @unknown default:
+            return "unknownDefault"
+        }
+    }
+}
+
+private extension UIApplication.State {
+    var description: String {
+        switch self {
+        case .active:
+            return "active"
+        case .inactive:
+            return "inactive"
+        case .background:
+            return "background"
         @unknown default:
             return "unknownDefault"
         }
