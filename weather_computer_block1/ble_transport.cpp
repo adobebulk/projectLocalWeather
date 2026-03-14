@@ -26,6 +26,10 @@ constexpr size_t kHexPreviewBytes = 16;
 constexpr char kServiceUuid[] = "19B10010-E8F2-537E-4F6C-D104768A1214";
 constexpr char kRxCharacteristicUuid[] = "19B10011-E8F2-537E-4F6C-D104768A1214";
 constexpr char kTxCharacteristicUuid[] = "19B10012-E8F2-537E-4F6C-D104768A1214";
+constexpr uint32_t kAckSequence = 0;
+constexpr uint8_t kAckStatusOk = 0;
+constexpr uint8_t kAckStatusParseError = 1;
+constexpr size_t kAckCrcOffset = 14;
 
 BLEServer* g_server = nullptr;
 BLECharacteristic* g_rx_characteristic = nullptr;
@@ -34,7 +38,7 @@ Stream* g_serial = nullptr;
 bool g_ready = false;
 bool g_device_connected = false;
 bool g_restart_advertising = false;
-uint8_t g_ack_payload[3] = {'A', 'C', 'K'};
+uint8_t g_ack_packet[protocol_parser::kAckPacketSize] = {};
 uint8_t g_rx_buffer[kRxBufferSize];
 size_t g_rx_length = 0;
 uint8_t g_pending_packets[kPendingPacketQueueDepth][kPendingPacketBufferSize];
@@ -85,21 +89,94 @@ void logUnsignedValueLine(const char* prefix, size_t value, const char* suffix =
   g_serial->println(line);
 }
 
-void sendAck() {
+uint32_t crc32Update(uint32_t crc, uint8_t data_byte) {
+  crc ^= static_cast<uint32_t>(data_byte);
+  for (uint8_t bit = 0; bit < 8; ++bit) {
+    if ((crc & 1U) != 0U) {
+      crc = (crc >> 1) ^ 0xEDB88320UL;
+    } else {
+      crc >>= 1;
+    }
+  }
+  return crc;
+}
+
+uint32_t computePacketCrc32(const uint8_t* packet, size_t length) {
+  uint32_t crc = 0xFFFFFFFFUL;
+  for (size_t i = 0; i < length; ++i) {
+    uint8_t data_byte = packet[i];
+    if (i >= kAckCrcOffset && i < (kAckCrcOffset + 4)) {
+      data_byte = 0;
+    }
+    crc = crc32Update(crc, data_byte);
+  }
+  return crc ^ 0xFFFFFFFFUL;
+}
+
+void writeU16Le(uint8_t* buffer, size_t offset, uint16_t value) {
+  buffer[offset] = static_cast<uint8_t>(value & 0xFFU);
+  buffer[offset + 1] = static_cast<uint8_t>((value >> 8) & 0xFFU);
+}
+
+void writeU32Le(uint8_t* buffer, size_t offset, uint32_t value) {
+  buffer[offset] = static_cast<uint8_t>(value & 0xFFU);
+  buffer[offset + 1] = static_cast<uint8_t>((value >> 8) & 0xFFU);
+  buffer[offset + 2] = static_cast<uint8_t>((value >> 16) & 0xFFU);
+  buffer[offset + 3] = static_cast<uint8_t>((value >> 24) & 0xFFU);
+}
+
+void buildAckPacket(uint32_t echoed_sequence, uint8_t status_code) {
+  memset(g_ack_packet, 0, sizeof(g_ack_packet));
+
+  const device_state::DeviceState* state = device_state::state();
+  const uint32_t active_weather_timestamp =
+      state->has_weather ? state->weather_timestamp : 0;
+  const uint32_t active_position_timestamp =
+      state->has_position ? state->position_timestamp : 0;
+
+  writeU16Le(g_ack_packet, 0, protocol_parser::kMagic);
+  g_ack_packet[2] = protocol_parser::kVersion;
+  g_ack_packet[3] = protocol_parser::kPacketTypeAckV1;
+  writeU16Le(g_ack_packet, 4, protocol_parser::kAckPacketSize);
+  writeU32Le(g_ack_packet, 6, kAckSequence);
+  writeU32Le(g_ack_packet, 10, 0);
+  writeU32Le(g_ack_packet, 14, 0);
+  writeU32Le(g_ack_packet, 18, echoed_sequence);
+  g_ack_packet[22] = status_code;
+  writeU32Le(g_ack_packet, 23, active_weather_timestamp);
+  writeU32Le(g_ack_packet, 27, active_position_timestamp);
+  g_ack_packet[31] = 0;
+
+  const uint32_t crc = computePacketCrc32(g_ack_packet, sizeof(g_ack_packet));
+  writeU32Le(g_ack_packet, 14, crc);
+}
+
+void sendAck(uint32_t echoed_sequence, uint8_t status_code) {
   if (g_tx_characteristic == nullptr) {
-    logLine("BLE: tx skipped, TX characteristic not ready");
+    logLine("ACK: send skipped, TX characteristic not ready");
     return;
   }
 
-  g_tx_characteristic->setValue(g_ack_payload, 3);
+  buildAckPacket(echoed_sequence, status_code);
+
+  if (g_serial != nullptr) {
+    char line[80];
+    snprintf(line, sizeof(line), "ACK: send start");
+    g_serial->println(line);
+    snprintf(line, sizeof(line), "ACK: sequence=%lu status=%u",
+             static_cast<unsigned long>(echoed_sequence), static_cast<unsigned>(status_code));
+    g_serial->println(line);
+  }
+
+  g_tx_characteristic->setValue(g_ack_packet, sizeof(g_ack_packet));
 
   if (g_device_connected) {
     g_tx_characteristic->notify();
-    logLine("BLE: tx ACK");
+    logLine("ACK: send success");
     return;
   }
 
-  logLine("BLE: tx ACK queued, no subscriber");
+  logLine("ACK: send queued, no subscriber");
 }
 
 void logAssemblerResult(const packet_assembler::FeedResult& result) {
@@ -166,6 +243,18 @@ void processPendingPackets() {
     if (g_serial != nullptr) {
       ingress_router::handlePacket(parse_result, *g_serial);
     }
+    const uint8_t packet_type = packet_length > 3 ? packet[3] : 0;
+    const uint32_t echoed_sequence =
+        (parse_result.status == protocol_parser::kParseOk ||
+         parse_result.status == protocol_parser::kParseBadCrc ||
+         parse_result.status == protocol_parser::kParseBadLength)
+            ? parse_result.header.sequence
+            : 0;
+    if (packet_type != protocol_parser::kPacketTypeAckV1) {
+      const uint8_t ack_status =
+          parse_result.status == protocol_parser::kParseOk ? kAckStatusOk : kAckStatusParseError;
+      sendAck(echoed_sequence, ack_status);
+    }
 
     g_pending_packet_lengths[g_pending_packet_head] = 0;
     g_pending_packet_head = (g_pending_packet_head + 1) % kPendingPacketQueueDepth;
@@ -213,7 +302,6 @@ class RxCallbacks : public BLECharacteristicCallbacks {
     if (packet_assembler::hasCompletePacket()) {
       enqueueCompletedPacket();
     }
-    sendAck();
   }
 };
 
@@ -264,7 +352,8 @@ bool begin(Stream& serial) {
 
   g_rx_characteristic->setCallbacks(&g_rx_callbacks);
   g_tx_characteristic->addDescriptor(new BLE2902());
-  g_tx_characteristic->setValue(g_ack_payload, 3);
+  buildAckPacket(0, kAckStatusOk);
+  g_tx_characteristic->setValue(g_ack_packet, sizeof(g_ack_packet));
 
   service->start();
   BLEAdvertising* advertising = BLEDevice::getAdvertising();
