@@ -74,6 +74,11 @@ static_assert(sizeof(protocol_parser::RegionalSnapshotV1) ==
 static_assert(sizeof(protocol_parser::PositionUpdateV1) ==
                   protocol_parser::kPositionUpdatePacketSize,
               "PositionUpdateV1 must remain byte-identical to protocol packet size");
+static_assert(sizeof(RecordHeader) == 16, "RecordHeader size must remain 16 bytes");
+static_assert(sizeof(PersistRecord<protocol_parser::PositionUpdateV1>) == 48,
+              "Persisted PositionUpdateV1 record must remain 48 bytes");
+static_assert(sizeof(PersistRecord<protocol_parser::RegionalSnapshotV1>) == 486,
+              "Persisted RegionalSnapshotV1 record must remain 486 bytes");
 
 const char* parseStatusLabel(protocol_parser::ParseStatus status) {
   if (status == protocol_parser::kParseBadMagic) {
@@ -132,7 +137,9 @@ bool writeRecord(Preferences* preferences, const char* key, uint32_t generation,
   serial.print(key);
   serial.print(" gen=");
   serial.print(generation);
-  serial.print(" bytes=");
+  serial.print(" payload_bytes=");
+  serial.print(sizeof(Payload));
+  serial.print(" record_bytes=");
   serial.println(sizeof(record));
 
   return preferences->putBytes(key, &record, sizeof(record)) == sizeof(record);
