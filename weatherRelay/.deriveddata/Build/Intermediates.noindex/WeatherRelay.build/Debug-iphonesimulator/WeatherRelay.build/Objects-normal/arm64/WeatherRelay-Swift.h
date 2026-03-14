@@ -310,18 +310,7 @@ SWIFT_CLASS("_TtC12WeatherRelay10BLEManager")
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
-@class CBCentralManager;
 @class CBPeripheral;
-@class NSString;
-@class NSNumber;
-@interface BLEManager (SWIFT_EXTENSION(WeatherRelay)) <CBCentralManagerDelegate>
-- (void)centralManagerDidUpdateState:(CBCentralManager * _Nonnull)central;
-- (void)centralManager:(CBCentralManager * _Nonnull)central didDiscoverPeripheral:(CBPeripheral * _Nonnull)peripheral advertisementData:(NSDictionary<NSString *, id> * _Nonnull)advertisementData RSSI:(NSNumber * _Nonnull)RSSI;
-- (void)centralManager:(CBCentralManager * _Nonnull)central didConnectPeripheral:(CBPeripheral * _Nonnull)peripheral;
-- (void)centralManager:(CBCentralManager * _Nonnull)central didFailToConnectPeripheral:(CBPeripheral * _Nonnull)peripheral error:(NSError * _Nullable)error;
-- (void)centralManager:(CBCentralManager * _Nonnull)central didDisconnectPeripheral:(CBPeripheral * _Nonnull)peripheral error:(NSError * _Nullable)error;
-@end
-
 @class CBService;
 @class CBCharacteristic;
 @interface BLEManager (SWIFT_EXTENSION(WeatherRelay)) <CBPeripheralDelegate>
@@ -330,6 +319,18 @@ SWIFT_CLASS("_TtC12WeatherRelay10BLEManager")
 - (void)peripheral:(CBPeripheral * _Nonnull)peripheral didUpdateNotificationStateForCharacteristic:(CBCharacteristic * _Nonnull)characteristic error:(NSError * _Nullable)error;
 - (void)peripheral:(CBPeripheral * _Nonnull)peripheral didUpdateValueForCharacteristic:(CBCharacteristic * _Nonnull)characteristic error:(NSError * _Nullable)error;
 - (void)peripheral:(CBPeripheral * _Nonnull)peripheral didWriteValueForCharacteristic:(CBCharacteristic * _Nonnull)characteristic error:(NSError * _Nullable)error;
+@end
+
+@class CBCentralManager;
+@class NSString;
+@class NSNumber;
+@interface BLEManager (SWIFT_EXTENSION(WeatherRelay)) <CBCentralManagerDelegate>
+- (void)centralManager:(CBCentralManager * _Nonnull)central willRestoreState:(NSDictionary<NSString *, id> * _Nonnull)dict;
+- (void)centralManagerDidUpdateState:(CBCentralManager * _Nonnull)central;
+- (void)centralManager:(CBCentralManager * _Nonnull)central didDiscoverPeripheral:(CBPeripheral * _Nonnull)peripheral advertisementData:(NSDictionary<NSString *, id> * _Nonnull)advertisementData RSSI:(NSNumber * _Nonnull)RSSI;
+- (void)centralManager:(CBCentralManager * _Nonnull)central didConnectPeripheral:(CBPeripheral * _Nonnull)peripheral;
+- (void)centralManager:(CBCentralManager * _Nonnull)central didFailToConnectPeripheral:(CBPeripheral * _Nonnull)peripheral error:(NSError * _Nullable)error;
+- (void)centralManager:(CBCentralManager * _Nonnull)central didDisconnectPeripheral:(CBPeripheral * _Nonnull)peripheral error:(NSError * _Nullable)error;
 @end
 
 SWIFT_CLASS("_TtC12WeatherRelay15LocationManager")

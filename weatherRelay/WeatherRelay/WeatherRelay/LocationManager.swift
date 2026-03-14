@@ -48,6 +48,10 @@ final class LocationManager: NSObject, ObservableObject {
         return currentFix.horizontalAccuracy >= 0
     }
 
+    var canRequestAlwaysAuthorization: Bool {
+        authorizationStatus == .authorizedWhenInUse
+    }
+
     private let locationManager = CLLocationManager()
 
     override init() {
@@ -59,9 +63,20 @@ final class LocationManager: NSObject, ObservableObject {
         print("LocationManager: initialized")
     }
 
+    func requestAlwaysAuthorizationIfPossible() {
+        guard canRequestAlwaysAuthorization else {
+            print("LocationManager: Always authorization request skipped status=\(authorizationStatus.description)")
+            return
+        }
+
+        print("LocationManager: requesting Always authorization")
+        locationManager.requestAlwaysAuthorization()
+    }
+
     private func startUpdatesIfAuthorized() {
         switch authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
+            locationManager.allowsBackgroundLocationUpdates = authorizationStatus == .authorizedAlways
             print("LocationManager: starting location updates")
             locationManager.startUpdatingLocation()
         case .notDetermined:

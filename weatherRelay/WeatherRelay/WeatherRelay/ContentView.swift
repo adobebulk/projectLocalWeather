@@ -87,6 +87,13 @@ struct ContentView: View {
             }
             .buttonStyle(.bordered)
             .disabled(!bleManager.didDiscoverCharacteristics || !locationManager.hasValidLocation)
+
+            if locationManager.canRequestAlwaysAuthorization {
+                Button("Enable Background Location") {
+                    locationManager.requestAlwaysAuthorizationIfPossible()
+                }
+                .buttonStyle(.borderedProminent)
+            }
         }
         .padding()
         .onChange(of: bleManager.didDiscoverCharacteristics) { _, _ in

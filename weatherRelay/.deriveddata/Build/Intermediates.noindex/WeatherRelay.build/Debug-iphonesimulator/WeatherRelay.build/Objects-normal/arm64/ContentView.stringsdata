@@ -36,6 +36,14 @@
       },
       {
         "comment": "",
+        "key": "Enable Background Location",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 92
+        }
+      },
+      {
+        "comment": "",
         "key": "Scan state: %@",
         "location": {
           "startingColumn": 22,

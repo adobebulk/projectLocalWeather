@@ -14,6 +14,7 @@ final class BLEManager: NSObject, ObservableObject {
     static let serviceUUID = CBUUID(string: "19B10010-E8F2-537E-4F6C-D104768A1214")
     static let rxCharacteristicUUID = CBUUID(string: "19B10011-E8F2-537E-4F6C-D104768A1214")
     static let txCharacteristicUUID = CBUUID(string: "19B10012-E8F2-537E-4F6C-D104768A1214")
+    static let restorationIdentifier = "com.ctsmith.WeatherRelay.central"
 
     @Published var bluetoothPoweredOn = false
     @Published var isScanning = false
@@ -68,7 +69,11 @@ final class BLEManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
-        centralManager = CBCentralManager(delegate: self, queue: nil)
+        centralManager = CBCentralManager(
+            delegate: self,
+            queue: nil,
+            options: [CBCentralManagerOptionRestoreIdentifierKey: Self.restorationIdentifier]
+        )
         if let lastSuccessfulPositionSendDate {
             print("BLEManager: initialized with last successful position send at \(Int(lastSuccessfulPositionSendDate.timeIntervalSince1970))")
         } else {
@@ -244,6 +249,33 @@ final class BLEManager: NSObject, ObservableObject {
 }
 
 extension BLEManager: CBCentralManagerDelegate {
+    func centralManager(_ central: CBCentralManager, willRestoreState dict: [String: Any]) {
+        let restoredPeripherals = (dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral]) ?? []
+        let restoredScanServices = (dict[CBCentralManagerRestoredStateScanServicesKey] as? [CBUUID]) ?? []
+
+        print(
+            """
+            BLEManager: willRestoreState \
+            peripherals=\(restoredPeripherals.count) \
+            scanServices=\(restoredScanServices.map(\.uuidString).joined(separator: ", "))
+            """
+        )
+
+        if let restoredPeripheral = restoredPeripherals.first(where: {
+            $0.name == Self.targetPeripheralName || $0.identifier == targetPeripheral?.identifier
+        }) ?? restoredPeripherals.first {
+            targetPeripheral = restoredPeripheral
+            restoredPeripheral.delegate = self
+            print("BLEManager: restored peripheral name=\(restoredPeripheral.name ?? "nil") state=\(restoredPeripheral.state.description)")
+
+            if restoredPeripheral.state == .connected {
+                isConnected = true
+                print("BLEManager: restored connected peripheral, rediscovering services")
+                restoredPeripheral.discoverServices([Self.serviceUUID])
+            }
+        }
+    }
+
     func centralManagerDidUpdateState(_ central: CBCentralManager) {
         bluetoothPoweredOn = central.state == .poweredOn
         print("BLEManager: central state changed to \(central.state.description)")
@@ -489,6 +521,23 @@ private extension CBManagerState {
             return "poweredOff"
         case .poweredOn:
             return "poweredOn"
+        @unknown default:
+            return "unknownDefault"
+        }
+    }
+}
+
+private extension CBPeripheralState {
+    var description: String {
+        switch self {
+        case .disconnected:
+            return "disconnected"
+        case .connecting:
+            return "connecting"
+        case .connected:
+            return "connected"
+        case .disconnecting:
+            return "disconnecting"
         @unknown default:
             return "unknownDefault"
         }
