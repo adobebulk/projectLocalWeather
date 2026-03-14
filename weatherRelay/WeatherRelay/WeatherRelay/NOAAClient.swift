@@ -39,6 +39,14 @@ struct NOAAQuantitativeSeriesValue {
     let normalizedValue: Double
 }
 
+struct NOAATextSeriesValue {
+    let fieldName: String
+    let validTime: String
+    let startDate: Date
+    let endDate: Date
+    let summary: String
+}
+
 struct OnePointWeatherSnapshot {
     let temperatureC: Double?
     let windSpeedKmh: Double?
@@ -600,6 +608,8 @@ final class NOAAClient {
             properties: properties,
             normalizer: convertLengthToMeters
         )
+        let weatherSeries = parseTextSeries(fieldName: "weather", properties: properties)
+        let hazardSeries = parseTextSeries(fieldName: "hazards", properties: properties)
 
         let slotOffsets = [0, 60, 120]
         let slots = slotOffsets.map { offsetMinutes -> OnePointWeatherSlot in
@@ -641,6 +651,18 @@ final class NOAAClient {
                 slotStart: slotStart,
                 slotEnd: slotEnd
             )
+            let weather = deriveSlotText(
+                series: weatherSeries,
+                fieldName: "weather",
+                slotStart: slotStart,
+                slotEnd: slotEnd
+            )
+            let hazards = deriveSlotText(
+                series: hazardSeries,
+                fieldName: "hazards",
+                slotStart: slotStart,
+                slotEnd: slotEnd
+            )
 
             return OnePointWeatherSlot(
                 offsetMinutes: offsetMinutes,
@@ -651,11 +673,15 @@ final class NOAAClient {
                 windGustKmh: windGust.value,
                 precipitationProbabilityPercent: precipitation.value,
                 visibilityMeters: visibility.value,
+                weatherSummary: weather.summary,
+                hazardSummary: hazards.summary,
                 temperatureSelectionNote: temperature.note,
                 windSpeedSelectionNote: windSpeed.note,
                 windGustSelectionNote: windGust.note,
                 precipitationSelectionNote: precipitation.note,
-                visibilitySelectionNote: visibility.note
+                visibilitySelectionNote: visibility.note,
+                weatherSelectionNote: weather.note,
+                hazardSelectionNote: hazards.note
             )
         }
 
@@ -732,7 +758,98 @@ final class NOAAClient {
         return (nil, "no usable \(fieldName) values")
     }
 
+    private static func parseTextSeries(
+        fieldName: String,
+        properties: [String: Any]
+    ) -> [NOAATextSeriesValue] {
+        guard
+            let field = properties[fieldName] as? [String: Any],
+            let values = field["values"] as? [[String: Any]]
+        else {
+            return []
+        }
+
+        return values.compactMap { item in
+            guard
+                let validTime = item["validTime"] as? String,
+                let dateRange = parseDateRange(from: validTime)
+            else {
+                return nil
+            }
+
+            let summary = summarizeTextValue(item["value"])
+            guard !summary.isEmpty else {
+                return nil
+            }
+
+            return NOAATextSeriesValue(
+                fieldName: fieldName,
+                validTime: validTime,
+                startDate: dateRange.start,
+                endDate: dateRange.end,
+                summary: summary
+            )
+        }
+    }
+
+    private static func deriveSlotText(
+        series: [NOAATextSeriesValue],
+        fieldName: String,
+        slotStart: Date,
+        slotEnd: Date
+    ) -> (summary: String?, note: String) {
+        let slotDuration = slotEnd.timeIntervalSince(slotStart)
+        let overlappingSeries = series.compactMap { sample -> (sample: NOAATextSeriesValue, overlap: TimeInterval)? in
+            let overlapStart = max(sample.startDate, slotStart)
+            let overlapEnd = min(sample.endDate, slotEnd)
+            let overlap = overlapEnd.timeIntervalSince(overlapStart)
+            guard overlap > 0 else {
+                return nil
+            }
+
+            return (sample, overlap)
+        }
+
+        if !overlappingSeries.isEmpty {
+            let summaries = deduplicatedStrings(overlappingSeries.map(\.sample.summary))
+            let summary = summaries.joined(separator: " | ")
+            let sourceDescription = overlappingSeries.map {
+                "\($0.sample.validTime) overlapMinutes=\(Int($0.overlap / 60)) summary=\($0.sample.summary)"
+            }.joined(separator: "; ")
+
+            return (
+                summary,
+                "overlap summary from \(overlappingSeries.count) interval(s): \(sourceDescription)"
+            )
+        }
+
+        let slotMidpoint = slotStart.addingTimeInterval(slotDuration / 2)
+        let nearest = series.sorted {
+            let leftDistance = distanceFromTextIntervalMidpoint($0, to: slotMidpoint)
+            let rightDistance = distanceFromTextIntervalMidpoint($1, to: slotMidpoint)
+            if leftDistance == rightDistance {
+                return $0.startDate < $1.startDate
+            }
+
+            return leftDistance < rightDistance
+        }.first
+
+        if let nearest {
+            return (
+                nearest.summary,
+                "fallback nearest interval summary: \(nearest.validTime) summary=\(nearest.summary)"
+            )
+        }
+
+        return (nil, "no usable \(fieldName) text values")
+    }
+
     private static func distanceFromIntervalMidpoint(_ value: NOAAQuantitativeSeriesValue, to date: Date) -> TimeInterval {
+        let midpoint = value.startDate.addingTimeInterval(value.endDate.timeIntervalSince(value.startDate) / 2)
+        return abs(midpoint.timeIntervalSince(date))
+    }
+
+    private static func distanceFromTextIntervalMidpoint(_ value: NOAATextSeriesValue, to date: Date) -> TimeInterval {
         let midpoint = value.startDate.addingTimeInterval(value.endDate.timeIntervalSince(value.startDate) / 2)
         return abs(midpoint.timeIntervalSince(date))
     }
@@ -764,6 +881,10 @@ final class NOAAClient {
             print("\(logPrefix): slot \(slot.offsetMinutes) windGust rule=\(slot.windGustSelectionNote)")
             print("\(logPrefix): slot \(slot.offsetMinutes) precipitation rule=\(slot.precipitationSelectionNote)")
             print("\(logPrefix): slot \(slot.offsetMinutes) visibility rule=\(slot.visibilitySelectionNote)")
+            print("\(logPrefix): slot \(slot.offsetMinutes) weather summary=\(slot.weatherSummary ?? "nil")")
+            print("\(logPrefix): slot \(slot.offsetMinutes) weather rule=\(slot.weatherSelectionNote)")
+            print("\(logPrefix): slot \(slot.offsetMinutes) hazard summary=\(slot.hazardSummary ?? "nil")")
+            print("\(logPrefix): slot \(slot.offsetMinutes) hazard rule=\(slot.hazardSelectionNote)")
         }
     }
 
@@ -888,6 +1009,18 @@ final class NOAAClient {
 
     nonisolated private static func formatDouble(_ value: Double) -> String {
         String(format: "%.2f", value)
+    }
+
+    private static func deduplicatedStrings(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+
+        for value in values where !seen.contains(value) {
+            seen.insert(value)
+            result.append(value)
+        }
+
+        return result
     }
 
     private static let fractionalISO8601Formatter: ISO8601DateFormatter = {

@@ -91,7 +91,7 @@ struct ContentView: View {
                     .disabled(!bleManager.didDiscoverCharacteristics || !locationManager.hasValidLocation)
 
                     NavigationLink("Weather Debug") {
-                        WeatherDebugView(locationManager: locationManager)
+                        WeatherDebugView(locationManager: locationManager, bleManager: bleManager)
                     }
                     .buttonStyle(.bordered)
 

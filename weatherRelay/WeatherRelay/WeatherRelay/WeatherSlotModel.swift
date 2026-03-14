@@ -22,11 +22,15 @@ struct OnePointWeatherSlot: Identifiable {
     let windGustKmh: Double?
     let precipitationProbabilityPercent: Double?
     let visibilityMeters: Double?
+    let weatherSummary: String?
+    let hazardSummary: String?
     let temperatureSelectionNote: String
     let windSpeedSelectionNote: String
     let windGustSelectionNote: String
     let precipitationSelectionNote: String
     let visibilitySelectionNote: String
+    let weatherSelectionNote: String
+    let hazardSelectionNote: String
 
     var id: Int { offsetMinutes }
 }

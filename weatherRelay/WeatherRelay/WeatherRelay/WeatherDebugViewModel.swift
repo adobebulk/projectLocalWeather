@@ -13,6 +13,7 @@ final class WeatherDebugViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var lastErrorMessage: String?
     @Published var latestFieldWeatherData: ThreeByThreeWeatherFieldDebugData?
+    @Published var latestRegionalSnapshotPacketDebug: RegionalSnapshotPacketDebugData?
 
     private let noaaClient: NOAAClient
 
@@ -45,6 +46,8 @@ final class WeatherDebugViewModel: ObservableObject {
             centerLongitude: locationFix.longitude
         )
         latestFieldWeatherData = weatherData
+        let packetDebug = RegionalSnapshotBuilder.makeRegionalSnapshotV1DebugData(field: weatherData)
+        latestRegionalSnapshotPacketDebug = packetDebug
         print(
             """
             WeatherDebugViewModel: NOAA 3x3 fetch completed \
@@ -53,6 +56,11 @@ final class WeatherDebugViewModel: ObservableObject {
             anchors=\(weatherData.anchorResults.count)
             """
         )
+        if packetDebug.isPacketLengthValid {
+            print("WeatherDebugViewModel: RegionalSnapshotV1 packet length validated bytes=\(packetDebug.packetByteLength)")
+        } else {
+            print("WeatherDebugViewModel: RegionalSnapshotV1 packet length invalid bytes=\(packetDebug.packetByteLength) expected=\(RegionalSnapshotBuilder.regionalSnapshotPacketSize)")
+        }
         if weatherData.anchorResults.allSatisfy({ $0.weatherData == nil }) {
             lastErrorMessage = "All 9 NOAA anchor fetches failed"
         }

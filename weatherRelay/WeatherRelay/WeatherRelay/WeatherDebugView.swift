@@ -9,6 +9,7 @@ import SwiftUI
 
 struct WeatherDebugView: View {
     @ObservedObject var locationManager: LocationManager
+    @ObservedObject var bleManager: BLEManager
     @StateObject private var viewModel = WeatherDebugViewModel()
 
     private var requestCoordinateText: String {
@@ -30,6 +31,22 @@ struct WeatherDebugView: View {
                     }
                 }
                 .disabled(viewModel.isLoading || locationManager.currentFix == nil)
+
+                Button("Send PositionUpdateV1") {
+                    bleManager.sendPositionPacket(locationFix: locationManager.currentFix)
+                }
+                .disabled(!bleManager.didDiscoverCharacteristics || !locationManager.hasValidLocation)
+
+                Button("Send RegionalSnapshotV1") {
+                    if let packetDebug = viewModel.latestRegionalSnapshotPacketDebug {
+                        if packetDebug.isPacketLengthValid {
+                            print("WeatherDebugView: RegionalSnapshotV1 BLE send intentionally disabled until dedicated transmit pass")
+                        } else {
+                            print("WeatherDebugView: RegionalSnapshotV1 send blocked packetLength=\(packetDebug.packetByteLength) expected=\(RegionalSnapshotBuilder.regionalSnapshotPacketSize)")
+                        }
+                    }
+                }
+                .disabled(!bleManager.didDiscoverCharacteristics || viewModel.latestRegionalSnapshotPacketDebug?.isPacketLengthValid != true)
             }
 
             Section("Request") {
@@ -75,6 +92,46 @@ struct WeatherDebugView: View {
                             }
                         } else {
                             Text("Fetch error: \(anchorResult.errorMessage ?? "Unknown error")")
+                        }
+                    }
+                }
+            }
+
+            if let packetDebug = viewModel.latestRegionalSnapshotPacketDebug {
+                Section("RegionalSnapshotV1 Packet") {
+                    Text("Sequence: \(packetDebug.sequence)")
+                    Text("Field anchor unix: \(packetDebug.fieldAnchorTimestampUnix)")
+                    Text("Field generation unix: \(packetDebug.fieldGenerationTimestampUnix)")
+                    Text("Center lat_e5: \(packetDebug.centerLatE5)")
+                    Text("Center lon_e5: \(packetDebug.centerLonE5)")
+                    Text("Field width mi: \(packetDebug.fieldWidthMi)")
+                    Text("Field height mi: \(packetDebug.fieldHeightMi)")
+                    Text("Grid rows: \(packetDebug.gridRows)")
+                    Text("Grid cols: \(packetDebug.gridCols)")
+                    Text("Slot count: \(packetDebug.slotCount)")
+                    Text("Reserved0: \(packetDebug.reserved0)")
+                    Text("Forecast horizon min: \(packetDebug.forecastHorizonMin)")
+                    Text("Source age min: \(packetDebug.sourceAgeMin)")
+                    Text("Packet byte length: \(packetDebug.packetByteLength)")
+                    Text("Packet length valid: \(packetDebug.isPacketLengthValid ? "Yes" : "No")")
+                    Text("Packet hex preview: \(packetDebug.packetHexPreview)")
+                }
+
+                Section("RegionalSnapshotV1 Layout") {
+                    ForEach(packetDebug.layoutLogLines, id: \.self) { line in
+                        Text(line)
+                    }
+                }
+
+                ForEach(packetDebug.anchors) { anchor in
+                    Section("Packet Anchor \(anchor.anchorLabel)") {
+                        Text("Coordinate: \(anchor.anchorCoordinateText)")
+
+                        ForEach(anchor.slots) { slot in
+                            Text("Slot +\(slot.offsetMinutes)m tempDeciC=\(slot.temperatureDeciC) windDeciKmh=\(slot.windSpeedDeciKmh) gustDeciKmh=\(slot.windGustDeciKmh) pop=\(slot.precipitationProbabilityPercent) kind=\(slot.precipitationKind.description) intensity=\(slot.precipitationIntensity.description) visibilityDam=\(slot.visibilityDam) hazardFlags=\(slot.hazardFlags.description) presence=0x\(String(format: "%02X", slot.presenceFlags))")
+                            ForEach(slot.quantizationNotes, id: \.self) { note in
+                                Text("Note: \(note)")
+                            }
                         }
                     }
                 }
