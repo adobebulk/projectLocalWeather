@@ -14,6 +14,8 @@ struct WeatherDebugView: View {
     @ObservedObject var viewModel: WeatherDebugViewModel
     @State private var shareItems: [Any] = []
     @State private var isShowingShareSheet = false
+    @State private var isPreparingShareLog = false
+    @State private var shareLogErrorMessage: String?
 
     private var requestCoordinateText: String {
         guard let fix = locationManager.currentFix else {
@@ -61,11 +63,33 @@ struct WeatherDebugView: View {
                 .disabled(!bleManager.didDiscoverCharacteristics || viewModel.latestRegionalSnapshotPacketDebug?.isPacketLengthValid != true)
 
                 Button("Share Log") {
-                    let logURL = AppLogger.shared.currentLogFileURL()
-                    AppLogger.shared.log(category: "DEBUG", message: "share log requested path=\(logURL.path)")
-                    shareItems = [logURL]
-                    isShowingShareSheet = true
+                    AppLogger.shared.log(category: "DEBUG", message: "share log requested")
+                    shareLogErrorMessage = nil
+                    isPreparingShareLog = true
+
+                    Task { @MainActor in
+                        do {
+                            AppLogger.shared.log(category: "DEBUG", message: "export log started")
+                            let exportURL = try createShareableLogSnapshot()
+                            let exportSize = (try? FileManager.default.attributesOfItem(atPath: exportURL.path)[.size] as? NSNumber)?.intValue ?? 0
+                            AppLogger.shared.log(
+                                category: "DEBUG",
+                                message: "export log succeeded path=\(exportURL.path) bytes=\(exportSize)"
+                            )
+                            shareItems = [exportURL]
+                            isShowingShareSheet = true
+                        } catch {
+                            shareLogErrorMessage = "Share Log failed: \(error.localizedDescription)"
+                            AppLogger.shared.log(
+                                category: "DEBUG",
+                                message: "export log failed error=\(error.localizedDescription)"
+                            )
+                        }
+
+                        isPreparingShareLog = false
+                    }
                 }
+                .disabled(isPreparingShareLog)
 
                 Button("Copy Log") {
                     let logText = AppLogger.shared.readCurrentLog()
@@ -79,6 +103,12 @@ struct WeatherDebugView: View {
                 Button("Clear Log") {
                     AppLogger.shared.clearLogs()
                     AppLogger.shared.log(category: "DEBUG", message: "clear log requested")
+                }
+
+                if let shareLogErrorMessage {
+                    Text(shareLogErrorMessage)
+                        .foregroundStyle(.red)
+                        .font(.footnote)
                 }
             }
 
@@ -206,7 +236,28 @@ struct WeatherDebugView: View {
             )
         }
         .sheet(isPresented: $isShowingShareSheet) {
-            ActivityViewController(activityItems: shareItems)
+            if shareItems.isEmpty {
+                Text("No log export available")
+                    .onAppear {
+                        let message = "share sheet presentation failed error=no-share-items"
+                        AppLogger.shared.log(category: "DEBUG", message: message)
+                        shareLogErrorMessage = "Share Log failed: no export file available"
+                    }
+            } else {
+                ActivityViewController(
+                    activityItems: shareItems,
+                    onPresented: {
+                        AppLogger.shared.log(category: "DEBUG", message: "share sheet presented")
+                    },
+                    onError: { error in
+                        AppLogger.shared.log(
+                            category: "DEBUG",
+                            message: "share sheet presentation failed error=\(error.localizedDescription)"
+                        )
+                        shareLogErrorMessage = "Share sheet failed: \(error.localizedDescription)"
+                    }
+                )
+            }
         }
     }
 
@@ -240,13 +291,43 @@ struct WeatherDebugView: View {
 
         return String(format: "%.2f", meters / 1_609.344)
     }
+
+    private func createShareableLogSnapshot() throws -> URL {
+        let logText = AppLogger.shared.readCurrentLog()
+        let timestamp = Self.exportFileDateFormatter.string(from: Date())
+        let fileName = "weatherRelay_export_\(timestamp).log"
+        let exportURL = FileManager.default.temporaryDirectory.appending(path: fileName)
+        try logText.write(to: exportURL, atomically: true, encoding: .utf8)
+        return exportURL
+    }
+
+    private static let exportFileDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        return formatter
+    }()
 }
 
 private struct ActivityViewController: UIViewControllerRepresentable {
     let activityItems: [Any]
+    let onPresented: () -> Void
+    let onError: (Error) -> Void
 
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        DispatchQueue.main.async {
+            onPresented()
+        }
+        controller.completionWithItemsHandler = { _, _, _, error in
+            if let error {
+                DispatchQueue.main.async {
+                    onError(error)
+                }
+            }
+        }
+        return controller
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}

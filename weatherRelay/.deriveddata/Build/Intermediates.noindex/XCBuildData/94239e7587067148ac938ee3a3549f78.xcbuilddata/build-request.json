@@ -19,19 +19,12 @@
     "activeArchitecture" : "undefined_arch",
     "activeRunDestination" : {
       "disableOnlyActiveArch" : true,
-      "platform" : "iphoneos",
-      "sdk" : "iphoneos26.2",
-      "sdkVariant" : "iphoneos",
+      "platform" : "iphonesimulator",
+      "sdk" : "iphonesimulator26.2",
+      "sdkVariant" : "iphonesimulator",
       "supportedArchitectures" : [
-        "armv4t",
-        "armv5",
-        "armv6",
-        "armv7",
-        "armv7f",
-        "armv7s",
-        "armv7k",
-        "arm64",
-        "arm64e"
+        "i386",
+        "x86_64"
       ],
       "targetArchitecture" : "undefined_arch"
     },
@@ -49,7 +42,8 @@
       "commandLine" : {
         "table" : {
           "ARCHS" : "arm64",
-          "ONLY_ACTIVE_ARCH" : "YES"
+          "ONLY_ACTIVE_ARCH" : "YES",
+          "SDKROOT" : "iphonesimulator26.2"
         }
       },
       "synthesized" : {
