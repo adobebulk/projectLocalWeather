@@ -58,15 +58,39 @@ final class BLEManager: NSObject, ObservableObject {
     private var rxCharacteristic: CBCharacteristic?
     private var txCharacteristic: CBCharacteristic?
     private var nextSequenceNumber: UInt32 = 202
-    private var lastPositionSendDate: Date?
+    private var pendingPositionSequence: UInt32?
+    private var pendingPositionTrigger: String?
 
-    private let autoSendInterval: TimeInterval = 10 * 60
+    private let positionSendInterval: TimeInterval = 10 * 60
     private let autoSendMaximumFixAge: TimeInterval = 60
+    private let lastSuccessfulPositionSendDefaultsKey = "lastSuccessfulPositionSendTimeInterval"
+    private let userDefaults = UserDefaults.standard
 
     override init() {
         super.init()
         centralManager = CBCentralManager(delegate: self, queue: nil)
-        print("BLEManager: initialized")
+        if let lastSuccessfulPositionSendDate {
+            print("BLEManager: initialized with last successful position send at \(Int(lastSuccessfulPositionSendDate.timeIntervalSince1970))")
+        } else {
+            print("BLEManager: initialized with no successful position send history")
+        }
+    }
+
+    private var lastSuccessfulPositionSendDate: Date? {
+        get {
+            guard let storedTimeInterval = userDefaults.object(forKey: lastSuccessfulPositionSendDefaultsKey) as? TimeInterval else {
+                return nil
+            }
+
+            return Date(timeIntervalSince1970: storedTimeInterval)
+        }
+        set {
+            if let newValue {
+                userDefaults.set(newValue.timeIntervalSince1970, forKey: lastSuccessfulPositionSendDefaultsKey)
+            } else {
+                userDefaults.removeObject(forKey: lastSuccessfulPositionSendDefaultsKey)
+            }
+        }
     }
 
     private func startScanningIfNeeded() {
@@ -107,78 +131,54 @@ final class BLEManager: NSObject, ObservableObject {
         targetPeripheral = nil
         rxCharacteristic = nil
         txCharacteristic = nil
-        lastPositionSendDate = nil
+        pendingPositionSequence = nil
+        pendingPositionTrigger = nil
     }
 
     func sendPositionPacket(locationFix: LocationManager.LocationFix?) {
         sendPositionPacket(locationFix: locationFix, trigger: "manual")
     }
 
-    func considerInitialAutoSend(locationFix: LocationManager.LocationFix?, trigger: String) {
+    func considerPositionSendIfDue(locationFix: LocationManager.LocationFix?, trigger: String) {
         guard isConnected && didDiscoverCharacteristics else {
-            print("BLEManager: initial auto-send skipped - BLE not ready trigger=\(trigger)")
+            print("BLEManager: send-if-due skipped - BLE not ready trigger=\(trigger)")
             return
         }
 
         guard let locationFix else {
-            print("BLEManager: initial auto-send skipped - no live location trigger=\(trigger)")
+            print("BLEManager: send-if-due skipped - no live location trigger=\(trigger)")
             return
         }
 
         guard locationFix.horizontalAccuracy >= 0 else {
-            print("BLEManager: initial auto-send skipped - invalid accuracy trigger=\(trigger)")
+            print("BLEManager: send-if-due skipped - invalid accuracy trigger=\(trigger)")
             return
         }
 
         let fixAge = Date().timeIntervalSince(locationFix.timestamp)
         guard fixAge <= autoSendMaximumFixAge else {
-            print("BLEManager: initial auto-send skipped - stale fix ageSeconds=\(Int(fixAge)) trigger=\(trigger)")
+            print("BLEManager: send-if-due skipped - stale fix ageSeconds=\(Int(fixAge)) trigger=\(trigger)")
             return
         }
 
-        guard lastPositionSendDate == nil else {
-            print("BLEManager: initial auto-send skipped - already sent initial position trigger=\(trigger)")
+        guard pendingPositionSequence == nil else {
+            print("BLEManager: send-if-due skipped - awaiting ack for sequence=\(pendingPositionSequence ?? 0) trigger=\(trigger)")
             return
         }
 
-        print("BLEManager: initial auto-send allowed trigger=\(trigger)")
-        sendPositionPacket(locationFix: locationFix, trigger: "initial/\(trigger)")
-    }
-
-    func considerPeriodicAutoSend(locationFix: LocationManager.LocationFix?, trigger: String) {
-        guard isConnected && didDiscoverCharacteristics else {
-            print("BLEManager: periodic auto-send skipped - BLE not ready trigger=\(trigger)")
+        guard let lastSuccessfulPositionSendDate else {
+            print("BLEManager: send-if-due allowed - no successful send yet trigger=\(trigger)")
+            sendPositionPacket(locationFix: locationFix, trigger: "initial/\(trigger)")
             return
         }
 
-        guard let locationFix else {
-            print("BLEManager: periodic auto-send skipped - no live location trigger=\(trigger)")
+        let secondsSinceLastSuccessfulSend = Date().timeIntervalSince(lastSuccessfulPositionSendDate)
+        guard secondsSinceLastSuccessfulSend >= positionSendInterval else {
+            print("BLEManager: send-if-due skipped - interval not reached secondsSinceLastSuccessfulSend=\(Int(secondsSinceLastSuccessfulSend)) trigger=\(trigger)")
             return
         }
 
-        guard locationFix.horizontalAccuracy >= 0 else {
-            print("BLEManager: periodic auto-send skipped - invalid accuracy trigger=\(trigger)")
-            return
-        }
-
-        let fixAge = Date().timeIntervalSince(locationFix.timestamp)
-        guard fixAge <= autoSendMaximumFixAge else {
-            print("BLEManager: periodic auto-send skipped - stale fix ageSeconds=\(Int(fixAge)) trigger=\(trigger)")
-            return
-        }
-
-        guard let lastPositionSendDate else {
-            print("BLEManager: periodic auto-send skipped - waiting for initial send trigger=\(trigger)")
-            return
-        }
-
-        let secondsSinceLastSend = Date().timeIntervalSince(lastPositionSendDate)
-        guard secondsSinceLastSend >= autoSendInterval else {
-            print("BLEManager: periodic auto-send skipped - interval not reached secondsSinceLastSend=\(Int(secondsSinceLastSend)) trigger=\(trigger)")
-            return
-        }
-
-        print("BLEManager: periodic auto-send allowed secondsSinceLastSend=\(Int(secondsSinceLastSend)) trigger=\(trigger)")
+        print("BLEManager: send-if-due allowed - 10 minute interval elapsed secondsSinceLastSuccessfulSend=\(Int(secondsSinceLastSuccessfulSend)) trigger=\(trigger)")
         sendPositionPacket(locationFix: locationFix, trigger: "periodic/\(trigger)")
     }
 
@@ -193,8 +193,9 @@ final class BLEManager: NSObject, ObservableObject {
         let accuracyMeters = UInt16(max(0, min(locationFix.horizontalAccuracy.rounded(), Double(UInt16.max))))
         let fixTimestampUnix = UInt32(max(0, locationFix.timestamp.timeIntervalSince1970.rounded()))
 
+        let sequence = nextSequenceNumber
         let values = PacketBuilder.PositionValues(
-            sequence: nextSequenceNumber,
+            sequence: sequence,
             timestampUnix: fixTimestampUnix,
             latE5: latitudeE5,
             lonE5: longitudeE5,
@@ -202,7 +203,8 @@ final class BLEManager: NSObject, ObservableObject {
             fixTimestampUnix: fixTimestampUnix
         )
         nextSequenceNumber += 1
-        lastPositionSendDate = Date()
+        pendingPositionSequence = sequence
+        pendingPositionTrigger = trigger
 
         let packet = PacketBuilder.makePositionUpdateV1(values: values)
         lastSentPacketHex = packet.hexString
@@ -210,6 +212,7 @@ final class BLEManager: NSObject, ObservableObject {
             """
             BLEManager: built PositionUpdateV1 packet \
             trigger=\(trigger) \
+            sequence=\(sequence) \
             latE5=\(latitudeE5) \
             lonE5=\(longitudeE5) \
             accuracyM=\(accuracyMeters) \
@@ -433,6 +436,27 @@ extension BLEManager: CBPeripheralDelegate {
                 activePositionTimestamp=\(ack.positionTimestamp)
                 """
             )
+
+            if ack.status == .ok, ack.sequence == pendingPositionSequence {
+                let acceptedAt = Date()
+                lastSuccessfulPositionSendDate = acceptedAt
+                print(
+                    """
+                    BLEManager: position send accepted \
+                    sequence=\(ack.sequence) \
+                    trigger=\(pendingPositionTrigger ?? "unknown") \
+                    acceptedAtUnix=\(Int(acceptedAt.timeIntervalSince1970))
+                    """
+                )
+                pendingPositionSequence = nil
+                pendingPositionTrigger = nil
+            } else if ack.sequence == pendingPositionSequence {
+                print("BLEManager: position send not accepted status=\(ack.status) sequence=\(ack.sequence)")
+                pendingPositionSequence = nil
+                pendingPositionTrigger = nil
+            } else {
+                print("BLEManager: ack sequence does not match pending position send ackSequence=\(ack.sequence) pendingSequence=\(pendingPositionSequence.map(String.init) ?? "none")")
+            }
         } catch {
             print("BLEManager: AckV1 parse failed error=\(error.localizedDescription)")
         }
