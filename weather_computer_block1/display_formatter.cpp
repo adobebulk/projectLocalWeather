@@ -217,9 +217,9 @@ const char* interpretationText(const interpolation::LocalEstimate& estimate) {
   }
 
   // Visibility can be missing in Block 1 packets. If no other strong signal is
-  // present, keep line 2 neutral instead of inferring CLEAR from unknown data.
+  // present, keep line 2 neutral instead of inferring CLEAR or UNKNOWN.
   if (!visibility_known) {
-    return "UNKNOWN";
+    return "NO SIG";
   }
 
   return "CLEAR";
@@ -240,8 +240,7 @@ void buildLine2(const interpolation::LocalEstimate& estimate,
   snprintf(interpretation, sizeof(interpretation), "%s", resolvedInterpretation(estimate, context));
 
   const bool stale = strcmp(interpretation, "DATA STALE") == 0;
-  const bool unknown = strcmp(interpretation, "UNKNOWN") == 0;
-  const bool suppress_confidence = stale || unknown;
+  const bool suppress_confidence = stale;
 
   if (!suppress_confidence) {
     snprintf(confidence, sizeof(confidence), "C%u%%",
@@ -299,16 +298,21 @@ void logDecision(const interpolation::LocalEstimate& estimate, const DisplayCont
   serial.println(estimate.hazard_flags, HEX);
 
   const bool stale = context.weather_age_minutes > kStaleThresholdMinutes;
+  const bool visibility_missing_only =
+      vis_missing && estimate.precip_kind == 0 && estimate.hazard_flags == 0;
   serial.print("DISPLAY: decision weather_age_min=");
   serial.print(context.weather_age_minutes);
   serial.print(" stale_threshold_min=");
   serial.print(kStaleThresholdMinutes);
   serial.print(" stale=");
   serial.println(stale ? 1 : 0);
+  serial.print("DISPLAY: decision visibility_missing_only=");
+  serial.println(visibility_missing_only ? 1 : 0);
 
   const char* interpretation = resolvedInterpretation(estimate, context);
-  const bool suppress_unknown = strcmp(interpretation, "UNKNOWN") == 0;
   const bool suppress_stale = strcmp(interpretation, "DATA STALE") == 0;
+  const uint8_t shown_confidence = suppress_stale ? 0 : estimate.confidence_score;
+  const char* suppression_reason = suppress_stale ? "stale" : "none";
   serial.print("DISPLAY: decision interpretation=");
   serial.print(interpretation);
   serial.print(" precedence=");
@@ -320,21 +324,18 @@ void logDecision(const interpolation::LocalEstimate& estimate, const DisplayCont
              strcmp(interpretation, "HAZE") == 0 || strcmp(interpretation, "MIXED") == 0 ||
              strcmp(interpretation, "WINDY") == 0) {
     serial.print("WEATHER_SIGNAL");
-  } else if (suppress_unknown) {
-    serial.print("UNKNOWN");
+  } else if (strcmp(interpretation, "NO SIG") == 0) {
+    serial.print("NEUTRAL");
   } else {
     serial.print("CLEAR");
   }
-  serial.print(" confidence_raw=");
+  serial.println();
+  serial.print("DISPLAY: decision confidence_raw=");
   serial.print(estimate.confidence_score);
-  serial.print(" confidence_suppressed=");
-  if (suppress_stale) {
-    serial.println("stale");
-  } else if (suppress_unknown) {
-    serial.println("unknown");
-  } else {
-    serial.println("none");
-  }
+  serial.print(" confidence_shown=");
+  serial.print(shown_confidence);
+  serial.print(" suppression_reason=");
+  serial.println(suppression_reason);
 }
 
 }  // namespace display_formatter
