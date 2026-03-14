@@ -318,6 +318,10 @@ final class NOAAClient {
             note=\(visibilityRecommendation.note)
             """
         )
+        AppLogger.shared.log(
+            category: "VISIBILITY",
+            message: "\(logPrefix) comparison forecastGridMeters=\(snapshot.visibilityMeters.map(Self.formatDouble) ?? "nil") observationMeters=\(observationVisibility?.normalizedVisibilityMeters.map(Self.formatDouble) ?? "nil") recommendation=\(visibilityRecommendation.recommendation.rawValue)"
+        )
         Self.logThreeSlotModel(threeSlotModel, logPrefix: logPrefix)
 
         return NOAAOnePointWeatherDebugData(
@@ -459,6 +463,10 @@ final class NOAAClient {
                 latestObservationURL=\(latestObservationURL.absoluteString)
                 """
             )
+            AppLogger.shared.log(
+                category: "NOAA",
+                message: "\(logPrefix) nearest observation station stationIdentifier=\(stationIdentifier) stationName=\(stationName ?? "nil")"
+            )
 
             let latestObservationJSON = try await fetchJSONObject(from: latestObservationURL)
             guard let latestProperties = latestObservationJSON["properties"] as? [String: Any] else {
@@ -515,6 +523,10 @@ final class NOAAClient {
                 isUsable=\(isUsable)
                 """
             )
+            AppLogger.shared.log(
+                category: "VISIBILITY",
+                message: "\(logPrefix) observation visibility normalized meters=\(normalizedVisibilityMeters.map(Self.formatDouble) ?? "nil") ageMinutes=\(observationAgeMinutes.map(String.init) ?? "nil") usable=\(isUsable)"
+            )
 
             return NOAAObservationVisibilityDebugData(
                 stationIdentifier: stationIdentifier,
@@ -532,6 +544,10 @@ final class NOAAClient {
             )
         } catch {
             print("\(logPrefix): observation visibility fetch failed error=\(error.localizedDescription)")
+            AppLogger.shared.log(
+                category: "NOAA",
+                message: "\(logPrefix) observation visibility fetch failed error=\(error.localizedDescription)"
+            )
             return nil
         }
     }

@@ -6,11 +6,14 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct WeatherDebugView: View {
     @ObservedObject var locationManager: LocationManager
     @ObservedObject var bleManager: BLEManager
     @ObservedObject var viewModel: WeatherDebugViewModel
+    @State private var shareItems: [Any] = []
+    @State private var isShowingShareSheet = false
 
     private var requestCoordinateText: String {
         guard let fix = locationManager.currentFix else {
@@ -34,6 +37,7 @@ struct WeatherDebugView: View {
 
                 Button("Send PositionUpdateV1") {
                     bleManager.sendPositionPacket(locationFix: locationManager.currentFix)
+                    AppLogger.shared.log(category: "BLE", message: "manual position packet send requested")
                 }
                 .disabled(!bleManager.didDiscoverCharacteristics || !locationManager.hasValidLocation)
 
@@ -41,12 +45,41 @@ struct WeatherDebugView: View {
                     if let packetDebug = viewModel.latestRegionalSnapshotPacketDebug {
                         if packetDebug.isPacketLengthValid {
                             bleManager.sendLatestRegionalSnapshotV1Debug()
+                            AppLogger.shared.log(
+                                category: "BLE",
+                                message: "manual weather packet send requested size=\(packetDebug.packetByteLength)"
+                            )
                         } else {
                             print("WeatherDebugView: RegionalSnapshotV1 send blocked packetLength=\(packetDebug.packetByteLength) expected=\(RegionalSnapshotBuilder.regionalSnapshotPacketSize)")
+                            AppLogger.shared.log(
+                                category: "DEBUG",
+                                message: "manual weather packet send blocked packetLength=\(packetDebug.packetByteLength)"
+                            )
                         }
                     }
                 }
                 .disabled(!bleManager.didDiscoverCharacteristics || viewModel.latestRegionalSnapshotPacketDebug?.isPacketLengthValid != true)
+
+                Button("Share Log") {
+                    let logURL = AppLogger.shared.currentLogFileURL()
+                    AppLogger.shared.log(category: "DEBUG", message: "share log requested path=\(logURL.path)")
+                    shareItems = [logURL]
+                    isShowingShareSheet = true
+                }
+
+                Button("Copy Log") {
+                    let logText = AppLogger.shared.readCurrentLog()
+                    UIPasteboard.general.string = logText
+                    AppLogger.shared.log(
+                        category: "DEBUG",
+                        message: "copy log requested bytes=\(logText.utf8.count)"
+                    )
+                }
+
+                Button("Clear Log") {
+                    AppLogger.shared.clearLogs()
+                    AppLogger.shared.log(category: "DEBUG", message: "clear log requested")
+                }
             }
 
             Section("Request") {
@@ -167,6 +200,13 @@ struct WeatherDebugView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             print("WeatherDebugView: appeared hasLocationFix=\(locationManager.currentFix != nil)")
+            AppLogger.shared.log(
+                category: "DEBUG",
+                message: "weather debug view appeared hasLocationFix=\(locationManager.currentFix != nil)"
+            )
+        }
+        .sheet(isPresented: $isShowingShareSheet) {
+            ActivityViewController(activityItems: shareItems)
         }
     }
 
@@ -200,4 +240,14 @@ struct WeatherDebugView: View {
 
         return String(format: "%.2f", meters / 1_609.344)
     }
+}
+
+private struct ActivityViewController: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

@@ -26,6 +26,7 @@ final class WeatherDebugViewModel: ObservableObject {
         guard let locationFix else {
             lastErrorMessage = "No live location fix available"
             print("WeatherDebugViewModel: fetch skipped - no live location fix")
+            AppLogger.shared.log(category: "NOAA", message: "fetch skipped - no live location fix")
             return
         }
 
@@ -40,6 +41,10 @@ final class WeatherDebugViewModel: ObservableObject {
             accuracy=\(locationFix.horizontalAccuracy) \
             timestamp=\(Int(locationFix.timestamp.timeIntervalSince1970))
             """
+        )
+        AppLogger.shared.log(
+            category: "NOAA",
+            message: "starting 3x3 fetch lat=\(locationFix.latitude) lon=\(locationFix.longitude) accuracy=\(locationFix.horizontalAccuracy)"
         )
 
         let weatherData = await noaaClient.fetchThreeByThreeField(
@@ -59,10 +64,19 @@ final class WeatherDebugViewModel: ObservableObject {
             packetRevision=\(latestPacketRevision)
             """
         )
+        AppLogger.shared.log(
+            category: "NOAA",
+            message: "3x3 fetch completed centerLat=\(weatherData.center.latitude) centerLon=\(weatherData.center.longitude) anchors=\(weatherData.anchorResults.count)"
+        )
         if packetDebug.isPacketLengthValid {
             print("WeatherDebugViewModel: RegionalSnapshotV1 packet length validated bytes=\(packetDebug.packetByteLength)")
+            AppLogger.shared.log(category: "PACKET", message: "regional snapshot packet length validated bytes=\(packetDebug.packetByteLength)")
         } else {
             print("WeatherDebugViewModel: RegionalSnapshotV1 packet length invalid bytes=\(packetDebug.packetByteLength) expected=\(RegionalSnapshotBuilder.regionalSnapshotPacketSize)")
+            AppLogger.shared.log(
+                category: "PACKET",
+                message: "regional snapshot packet length invalid bytes=\(packetDebug.packetByteLength) expected=\(RegionalSnapshotBuilder.regionalSnapshotPacketSize)"
+            )
         }
         if weatherData.anchorResults.allSatisfy({ $0.weatherData == nil }) {
             lastErrorMessage = "All 9 NOAA anchor fetches failed"

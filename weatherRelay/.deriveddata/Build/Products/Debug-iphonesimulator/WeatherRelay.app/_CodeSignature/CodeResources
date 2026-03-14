@@ -4,6 +4,14 @@
 <dict>
 	<key>files</key>
 	<dict>
+		<key>AppIcon60x60@2x.png</key>
+		<data>
+		NhbKx0Rug/WIFsapq6/vLjjsQxc=
+		</data>
+		<key>AppIcon76x76@2x~ipad.png</key>
+		<data>
+		dDK2BR3u6kOQXYfuNA+GTbLwFvc=
+		</data>
 		<key>Info.plist</key>
 		<data>
 		nG9fseHslKR2IFAjXfvIbL27rQI=
@@ -14,7 +22,7 @@
 		</data>
 		<key>WeatherRelay.debug.dylib</key>
 		<data>
-		YjKZacS35C4sP8me8NjuEr127kg=
+		DlO7/nZRRG8AcM9ecA2j/eohNwo=
 		</data>
 		<key>__preview.dylib</key>
 		<data>
@@ -23,11 +31,25 @@
 	</dict>
 	<key>files2</key>
 	<dict>
+		<key>AppIcon60x60@2x.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			1k28zbvWHJhhlUM87V4RVM8XFB7QNHjBMgSfGy7Phgc=
+			</data>
+		</dict>
+		<key>AppIcon76x76@2x~ipad.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			SKRXingkPNzHQVUyAAk5mQ4RqSALiZePEoSZ3gII4aU=
+			</data>
+		</dict>
 		<key>WeatherRelay.debug.dylib</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			N3fE2vY7r55OH8+h7NEEl4bsChhysaAjNFTiuHvb/qc=
+			A4jUHTjmEyzmxyPfHm0NOI9RFcA9ZZLgk9YpYKKh+6k=
 			</data>
 		</dict>
 		<key>__preview.dylib</key>

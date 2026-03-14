@@ -263,6 +263,10 @@ final class BLEManager: NSObject, ObservableObject {
             writeType=\(writeTypeDescription)
             """
         )
+        AppLogger.shared.log(
+            category: "BLE",
+            message: "weather packet send start size=\(packetDebug.packet.count) chunks=\(chunks.count) chunkSize=\(chunkSize)"
+        )
 
         if writeType == .withResponse {
             writeNextWeatherChunk()
@@ -413,6 +417,10 @@ final class BLEManager: NSObject, ObservableObject {
         let writeTypeDescription = writeType == .withResponse ? "withResponse" : "withoutResponse"
 
         print("BLEManager: writing \(label) hex=\(payload.hexString) using \(writeTypeDescription)")
+        AppLogger.shared.log(
+            category: "BLE",
+            message: "packet sent label=\(label) size=\(payload.count) writeType=\(writeTypeDescription)"
+        )
         peripheral.writeValue(payload, for: rxCharacteristic, type: writeType)
     }
 

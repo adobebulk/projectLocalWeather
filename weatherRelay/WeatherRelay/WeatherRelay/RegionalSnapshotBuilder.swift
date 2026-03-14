@@ -152,6 +152,10 @@ enum RegionalSnapshotBuilder {
             hexPreview=\(packet.prefix(48).map { String(format: "%02X", $0) }.joined(separator: " "))
             """
         )
+        AppLogger.shared.log(
+            category: "PACKET",
+            message: "regional snapshot built sequence=\(sequence) bytes=\(packet.count) sourceAgeMin=\(sourceAgeMin)"
+        )
 
         return RegionalSnapshotPacketDebugData(
             sequence: sequence,
@@ -412,6 +416,10 @@ enum RegionalSnapshotBuilder {
             observationAgeMinutes=\(observationAgeMinutes.map(String.init) ?? "nil") \
             packetVisibilityPreSerializationMeters=\(selectedMeters.map { String(format: "%.2f", $0) } ?? "nil")
             """
+        )
+        AppLogger.shared.log(
+            category: "PACKET",
+            message: "\(anchorLabel) slot=\(offsetMinutes) visibility source=\(source.rawValue) meters=\(selectedMeters.map { String(format: "%.2f", $0) } ?? "nil")"
         )
 
         return (source, selectedMeters)

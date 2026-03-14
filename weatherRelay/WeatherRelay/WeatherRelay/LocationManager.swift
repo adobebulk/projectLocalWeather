@@ -131,6 +131,10 @@ extension LocationManager: CLLocationManagerDelegate {
             timestamp=\(location.timestamp.timeIntervalSince1970)
             """
         )
+        AppLogger.shared.log(
+            category: "LOCATION",
+            message: "updated lat=\(location.coordinate.latitude) lon=\(location.coordinate.longitude) accuracy=\(location.horizontalAccuracy)"
+        )
     }
 
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {

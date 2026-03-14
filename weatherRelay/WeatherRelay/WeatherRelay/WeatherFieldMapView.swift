@@ -14,6 +14,7 @@ struct WeatherFieldMapView: View {
 
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedSlotOffsetMinutes = 0
+    @State private var selectedAnchorNode: AnchorWeatherNode?
 
     private let slotOffsets = [0, 60, 120]
 
@@ -34,16 +35,23 @@ struct WeatherFieldMapView: View {
         return corners + [first]
     }
 
-    private var annotations: [WeatherFieldMapAnnotation] {
+    private var anchorNodes: [AnchorWeatherNode] {
         guard let fieldData else {
             return []
         }
 
         return fieldData.anchorResults.map { anchorResult in
             let slot = anchorResult.weatherData?.threeSlotModel.slots.first(where: { $0.offsetMinutes == selectedSlotOffsetMinutes })
-            return WeatherFieldMapAnnotation(
+            let packetSlot = viewModel.latestRegionalSnapshotPacketDebug?
+                .anchors
+                .first(where: { $0.anchorLabel == anchorResult.anchor.label })?
+                .slots
+                .first(where: { $0.offsetMinutes == selectedSlotOffsetMinutes })
+            return AnchorWeatherNode(
                 anchorResult: anchorResult,
-                selectedSlot: slot
+                selectedSlotOffsetMinutes: selectedSlotOffsetMinutes,
+                slot: slot,
+                packetSlot: packetSlot
             )
         }
     }
@@ -74,9 +82,16 @@ struct WeatherFieldMapView: View {
                             .stroke(.teal.opacity(0.8), lineWidth: 2)
                     }
 
-                    ForEach(annotations) { annotation in
-                        Annotation(annotation.anchorLabel, coordinate: annotation.coordinate) {
-                            WeatherFieldAnchorAnnotationView(annotation: annotation)
+                    ForEach(anchorNodes) { node in
+                        Annotation(node.anchorId, coordinate: node.coordinate) {
+                            WeatherFieldAnchorAnnotationView(node: node)
+                                .onTapGesture {
+                                    selectedAnchorNode = node
+                                    AppLogger.shared.log(
+                                        category: "MAP",
+                                        message: "anchor tapped id=\(node.anchorId) slot=\(node.slotOffsetMinutes) visibilitySource=\(node.visibilitySource ?? "none")"
+                                    )
+                                }
                         }
                     }
                 }
@@ -85,13 +100,13 @@ struct WeatherFieldMapView: View {
 
                 List {
                     Section("Anchor Summary") {
-                        ForEach(annotations) { annotation in
+                        ForEach(anchorNodes) { node in
                             Text(
                                 """
-                                \(annotation.anchorLabel) \
-                                windMph=\(annotation.windDisplayText) \
-                                visibility=\(annotation.visibilityDisplayText) \
-                                missing=\(annotation.isMissing ? "yes" : "no")
+                                \(node.anchorId) \
+                                wind=\(node.windDisplayText) \
+                                visibility=\(node.visibilityDisplayText) \
+                                missing=\(node.isMissing ? "yes" : "no")
                                 """
                             )
                         }
@@ -110,15 +125,19 @@ struct WeatherFieldMapView: View {
         .navigationTitle("Weather Field Map")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            print("WeatherFieldMapView: appeared hasField=\(fieldData != nil) slotOffsetMin=\(selectedSlotOffsetMinutes)")
+            let hasField = fieldData != nil
+            AppLogger.shared.log(category: "MAP", message: "weather field map appeared hasField=\(hasField) slot=\(selectedSlotOffsetMinutes)")
             updateCameraPosition()
         }
         .onChange(of: selectedSlotOffsetMinutes) { _, newOffset in
-            print("WeatherFieldMapView: selected slot changed slotOffsetMin=\(newOffset)")
+            AppLogger.shared.log(category: "MAP", message: "map slot changed slotOffset=\(newOffset)")
         }
         .onChange(of: viewModel.latestPacketRevision) { _, newRevision in
-            print("WeatherFieldMapView: weather field changed packetRevision=\(newRevision) hasField=\(fieldData != nil)")
+            AppLogger.shared.log(category: "MAP", message: "map weather field changed packetRevision=\(newRevision) hasField=\(fieldData != nil)")
             updateCameraPosition()
+        }
+        .sheet(item: $selectedAnchorNode) { node in
+            AnchorDetailView(anchor: node)
         }
     }
 
@@ -154,79 +173,190 @@ struct WeatherFieldMapView: View {
         )
 
         cameraPosition = .region(region)
-        print(
-            """
-            WeatherFieldMapView: camera updated \
-            centerLat=\(fieldData.center.latitude) \
-            centerLon=\(fieldData.center.longitude) \
-            latDelta=\(latitudeSpan) \
-            lonDelta=\(longitudeSpan)
-            """
+        AppLogger.shared.log(
+            category: "MAP",
+            message: "map camera updated centerLat=\(fieldData.center.latitude) centerLon=\(fieldData.center.longitude) latDelta=\(latitudeSpan) lonDelta=\(longitudeSpan)"
         )
     }
 }
 
-private struct WeatherFieldMapAnnotation: Identifiable {
-    let anchorLabel: String
-    let coordinate: CLLocationCoordinate2D
-    let windDisplayText: String
-    let visibilityDisplayText: String
+private struct AnchorWeatherNode: Identifiable {
+    let anchorId: String
+    let latitude: Double
+    let longitude: Double
+    let slotOffsetMinutes: Int
+    let slotStartDate: Date?
+    let slotEndDate: Date?
+    let temperatureC: Double?
+    let windSpeedKmh: Double?
+    let windGustKmh: Double?
+    let precipitationProbabilityPercent: Double?
+    let precipitationKind: String?
+    let precipitationIntensity: String?
+    let visibilityMeters: Double?
+    let hazardText: String?
+    let visibilitySource: String?
+    let forecastGridVisibilityMeters: Double?
+    let observationVisibilityMeters: Double?
+    let observationAgeMinutes: Int?
+    let finalPacketVisibilityMeters: UInt16?
     let isMissing: Bool
 
-    var id: String { anchorLabel }
+    var id: String { "\(anchorId)-\(slotOffsetMinutes)" }
 
-    init(anchorResult: WeatherFieldAnchorResult, selectedSlot: OnePointWeatherSlot?) {
-        anchorLabel = anchorResult.anchor.label
-        coordinate = CLLocationCoordinate2D(
-            latitude: anchorResult.anchor.latitude,
-            longitude: anchorResult.anchor.longitude
-        )
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
 
-        let isSlotMissing = selectedSlot == nil
-        let isAnchorMissing = anchorResult.weatherData == nil
-        isMissing = isAnchorMissing || isSlotMissing
-
-        if let windKmh = selectedSlot?.windSpeedKmh {
-            let windMph = windKmh * 0.621371
-            windDisplayText = "W\(Int(windMph.rounded()))"
-        } else {
-            windDisplayText = "W--"
+    var windDisplayText: String {
+        guard let windSpeedKmh else {
+            return "W--"
         }
 
-        if let visibilityMeters = selectedSlot?.visibilityMeters {
-            let visibilityMiles = visibilityMeters / 1_609.344
-            if visibilityMiles >= 10 {
-                visibilityDisplayText = "V\(Int(visibilityMiles.rounded()))"
-            } else {
-                visibilityDisplayText = String(format: "V%.1f", visibilityMiles)
+        let mph = windSpeedKmh * 0.621371
+        return "W\(Int(mph.rounded()))"
+    }
+
+    var visibilityDisplayText: String {
+        if let finalPacketVisibilityMeters, finalPacketVisibilityMeters > 0 {
+            let miles = Double(finalPacketVisibilityMeters) / 1_609.344
+            if miles >= 10 {
+                return "V\(Int(miles.rounded()))"
             }
-        } else {
-            visibilityDisplayText = "V--"
+
+            return String(format: "V%.1f", miles)
         }
+
+        return "V--"
+    }
+
+    init(
+        anchorResult: WeatherFieldAnchorResult,
+        selectedSlotOffsetMinutes: Int,
+        slot: OnePointWeatherSlot?,
+        packetSlot: RegionalSnapshotSlotPacketDebug?
+    ) {
+        anchorId = anchorResult.anchor.label
+        latitude = anchorResult.anchor.latitude
+        longitude = anchorResult.anchor.longitude
+        slotOffsetMinutes = selectedSlotOffsetMinutes
+        slotStartDate = slot?.startDate
+        slotEndDate = slot?.endDate
+        temperatureC = slot?.temperatureC
+        windSpeedKmh = slot?.windSpeedKmh
+        windGustKmh = slot?.windGustKmh
+        precipitationProbabilityPercent = slot?.precipitationProbabilityPercent
+        precipitationKind = packetSlot?.precipitationKind.description
+        precipitationIntensity = packetSlot?.precipitationIntensity.description
+        visibilityMeters = slot?.visibilityMeters
+        hazardText = packetSlot?.hazardFlags.description
+        visibilitySource = packetSlot?.visibilitySource
+        forecastGridVisibilityMeters = slot?.visibilityMeters
+        observationVisibilityMeters = anchorResult.weatherData?.observationVisibility?.normalizedVisibilityMeters
+        observationAgeMinutes = anchorResult.weatherData?.observationVisibility?.observationAgeMinutes
+        finalPacketVisibilityMeters = packetSlot?.visibilityM
+        isMissing = anchorResult.weatherData == nil || slot == nil
     }
 }
 
 private struct WeatherFieldAnchorAnnotationView: View {
-    let annotation: WeatherFieldMapAnnotation
+    let node: AnchorWeatherNode
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(annotation.anchorLabel)
+            Text(node.anchorId)
                 .font(.caption2)
                 .fontWeight(.bold)
-            Text(annotation.windDisplayText)
+            Text(node.windDisplayText)
                 .font(.caption2)
-            Text(annotation.visibilityDisplayText)
+            Text(node.visibilityDisplayText)
                 .font(.caption2)
         }
-        .foregroundStyle(annotation.isMissing ? Color.primary : Color.white)
+        .foregroundStyle(node.isMissing ? Color.primary : Color.white)
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(annotation.isMissing ? Color.gray.opacity(0.35) : Color.blue.opacity(0.85))
+        .background(node.isMissing ? Color.gray.opacity(0.35) : Color.blue.opacity(0.85))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
             RoundedRectangle(cornerRadius: 8)
-                .stroke(annotation.isMissing ? Color.gray : Color.blue, lineWidth: 1)
+                .stroke(node.isMissing ? Color.gray : Color.blue, lineWidth: 1)
         )
     }
+}
+
+private struct AnchorDetailView: View {
+    let anchor: AnchorWeatherNode
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section("Anchor") {
+                    Text("Anchor ID: \(anchor.anchorId)")
+                    Text("Latitude: \(formatCoordinate(anchor.latitude))")
+                    Text("Longitude: \(formatCoordinate(anchor.longitude))")
+                }
+
+                Section("Slot") {
+                    Text("Slot offset: \(anchor.slotOffsetMinutes) min")
+                    Text("validTime: \(formatValidTime(start: anchor.slotStartDate, end: anchor.slotEndDate))")
+                }
+
+                Section("Weather") {
+                    Text("Temperature: \(formatDouble(anchor.temperatureC, suffix: " C"))")
+                    Text("Wind speed: \(formatDouble(anchor.windSpeedKmh, suffix: " km/h"))")
+                    Text("Wind gust: \(formatDouble(anchor.windGustKmh, suffix: " km/h"))")
+                    Text("Precip probability: \(formatDouble(anchor.precipitationProbabilityPercent, suffix: " %"))")
+                    Text("Precip type: \(formatText(anchor.precipitationKind))")
+                    Text("Visibility: \(formatDouble(anchor.visibilityMeters, suffix: " m"))")
+                    Text("Hazards: \(formatText(anchor.hazardText))")
+                }
+
+                Section("Visibility Diagnostics") {
+                    Text("visibility source: \(formatText(anchor.visibilitySource))")
+                    Text("forecast-grid visibility meters: \(formatDouble(anchor.forecastGridVisibilityMeters, suffix: " m"))")
+                    Text("observation visibility meters: \(formatDouble(anchor.observationVisibilityMeters, suffix: " m"))")
+                    Text("observation age: \(anchor.observationAgeMinutes.map { "\($0) min" } ?? "—")")
+                    Text("final packet visibility field: \(anchor.finalPacketVisibilityMeters.map(String.init) ?? "—")")
+                }
+            }
+            .navigationTitle(anchor.anchorId)
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+
+    private func formatCoordinate(_ value: Double) -> String {
+        String(format: "%.5f", value)
+    }
+
+    private func formatDouble(_ value: Double?, suffix: String) -> String {
+        guard let value else {
+            return "—"
+        }
+
+        return String(format: "%.2f%@", value, suffix)
+    }
+
+    private func formatText(_ value: String?) -> String {
+        guard let value, !value.isEmpty else {
+            return "—"
+        }
+
+        return value
+    }
+
+    private func formatValidTime(start: Date?, end: Date?) -> String {
+        guard let start, let end else {
+            return "—"
+        }
+
+        return "\(Self.timeFormatter.string(from: start)) to \(Self.timeFormatter.string(from: end))"
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter
+    }()
 }

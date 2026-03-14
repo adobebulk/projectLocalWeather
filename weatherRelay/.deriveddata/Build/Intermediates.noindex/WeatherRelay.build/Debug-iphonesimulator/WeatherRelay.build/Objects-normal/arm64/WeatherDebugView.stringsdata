@@ -7,7 +7,7 @@
         "key": "Weather Debug",
         "location": {
           "startingColumn": 26,
-          "startingLine": 166
+          "startingLine": 199
         }
       },
       {
@@ -15,7 +15,7 @@
         "key": "Controls",
         "location": {
           "startingColumn": 21,
-          "startingLine": 25
+          "startingLine": 28
         }
       },
       {
@@ -23,7 +23,7 @@
         "key": "Request",
         "location": {
           "startingColumn": 21,
-          "startingLine": 52
+          "startingLine": 85
         }
       },
       {
@@ -31,7 +31,7 @@
         "key": "3x3 Field Summary",
         "location": {
           "startingColumn": 25,
-          "startingLine": 60
+          "startingLine": 93
         }
       },
       {
@@ -39,7 +39,7 @@
         "key": "RegionalSnapshotV1 Packet",
         "location": {
           "startingColumn": 25,
-          "startingLine": 121
+          "startingLine": 154
         }
       },
       {
@@ -47,7 +47,7 @@
         "key": "RegionalSnapshotV1 Layout",
         "location": {
           "startingColumn": 25,
-          "startingLine": 140
+          "startingLine": 173
         }
       },
       {
@@ -55,7 +55,7 @@
         "key": "Last Error",
         "location": {
           "startingColumn": 25,
-          "startingLine": 161
+          "startingLine": 194
         }
       },
       {
@@ -63,7 +63,7 @@
         "key": "Developer NOAA Debug",
         "location": {
           "startingColumn": 22,
-          "startingLine": 26
+          "startingLine": 29
         }
       },
       {
@@ -71,7 +71,7 @@
         "key": "Field center: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 27
+          "startingLine": 30
         }
       },
       {
@@ -79,7 +79,7 @@
         "key": "Fetching...",
         "location": {
           "startingColumn": 46,
-          "startingLine": 28
+          "startingLine": 31
         }
       },
       {
@@ -87,7 +87,7 @@
         "key": "Fetch NOAA 3x3 Field",
         "location": {
           "startingColumn": 62,
-          "startingLine": 28
+          "startingLine": 31
         }
       },
       {
@@ -95,7 +95,7 @@
         "key": "Send PositionUpdateV1",
         "location": {
           "startingColumn": 24,
-          "startingLine": 35
+          "startingLine": 38
         }
       },
       {
@@ -103,7 +103,31 @@
         "key": "Send RegionalSnapshotV1",
         "location": {
           "startingColumn": 24,
-          "startingLine": 40
+          "startingLine": 44
+        }
+      },
+      {
+        "comment": "",
+        "key": "Share Log",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 63
+        }
+      },
+      {
+        "comment": "",
+        "key": "Copy Log",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 70
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Log",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 79
         }
       },
       {
@@ -111,7 +135,7 @@
         "key": "Coordinate: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 53
+          "startingLine": 86
         }
       },
       {
@@ -119,7 +143,7 @@
         "key": "Location status: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 54
+          "startingLine": 87
         }
       },
       {
@@ -127,7 +151,7 @@
         "key": "Accuracy: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 55
+          "startingLine": 88
         }
       },
       {
@@ -135,7 +159,7 @@
         "key": "Fix timestamp: %@",
         "location": {
           "startingColumn": 22,
-          "startingLine": 56
+          "startingLine": 89
         }
       },
       {
@@ -143,7 +167,7 @@
         "key": "Center latitude: %@",
         "location": {
           "startingColumn": 26,
-          "startingLine": 61
+          "startingLine": 94
         }
       },
       {
@@ -151,7 +175,7 @@
         "key": "Center longitude: %@",
         "location": {
           "startingColumn": 26,
-          "startingLine": 62
+          "startingLine": 95
         }
       },
       {
@@ -159,7 +183,7 @@
         "key": "Field anchor unix: %lld",
         "location": {
           "startingColumn": 26,
-          "startingLine": 63
+          "startingLine": 96
         }
       },
       {
@@ -167,7 +191,7 @@
         "key": "Anchor ordering: r0c0 r0c1 r0c2 r1c0 r1c1 r1c2 r2c0 r2c1 r2c2",
         "location": {
           "startingColumn": 26,
-          "startingLine": 64
+          "startingLine": 97
         }
       },
       {
@@ -175,7 +199,7 @@
         "key": "Anchor spacing meters: %lld",
         "location": {
           "startingColumn": 26,
-          "startingLine": 65
+          "startingLine": 98
         }
       },
       {
@@ -183,7 +207,7 @@
         "key": "Anchor spacing miles: %lld",
         "location": {
           "startingColumn": 26,
-          "startingLine": 66
+          "startingLine": 99
         }
       },
       {
@@ -191,7 +215,7 @@
         "key": "Anchors fetched: %lld",
         "location": {
           "startingColumn": 26,
-          "startingLine": 67
+          "startingLine": 100
         }
       },
       {
@@ -199,7 +223,7 @@
         "key": "Anchor %@",
         "location": {
           "startingColumn": 29,
-          "startingLine": 71
+          "startingLine": 104
         }
       },
       {
@@ -207,7 +231,7 @@
         "key": "Coordinate: %@",
         "location": {
           "startingColumn": 30,
-          "startingLine": 72
+          "startingLine": 105
         }
       },
       {
@@ -215,7 +239,7 @@
         "key": "CWA: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 75
+          "startingLine": 108
         }
       },
       {
@@ -223,7 +247,7 @@
         "key": "Grid ID: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 76
+          "startingLine": 109
         }
       },
       {
@@ -231,7 +255,7 @@
         "key": "Grid X: %lld",
         "location": {
           "startingColumn": 34,
-          "startingLine": 77
+          "startingLine": 110
         }
       },
       {
@@ -239,7 +263,7 @@
         "key": "Grid Y: %lld",
         "location": {
           "startingColumn": 34,
-          "startingLine": 78
+          "startingLine": 111
         }
       },
       {
@@ -247,7 +271,7 @@
         "key": "forecastGridData: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 79
+          "startingLine": 112
         }
       },
       {
@@ -255,7 +279,7 @@
         "key": "Fetched at: %lld",
         "location": {
           "startingColumn": 34,
-          "startingLine": 80
+          "startingLine": 113
         }
       },
       {
@@ -263,7 +287,7 @@
         "key": "Weather Summary: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 81
+          "startingLine": 114
         }
       },
       {
@@ -271,7 +295,7 @@
         "key": "Hazard Summary: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 82
+          "startingLine": 115
         }
       },
       {
@@ -279,7 +303,7 @@
         "key": "Forecast-grid visibility meters: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 83
+          "startingLine": 116
         }
       },
       {
@@ -287,7 +311,7 @@
         "key": "Forecast-grid visibility validTime: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 84
+          "startingLine": 117
         }
       },
       {
@@ -295,7 +319,7 @@
         "key": "Forecast-grid visibility usable: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 85
+          "startingLine": 118
         }
       },
       {
@@ -303,7 +327,7 @@
         "key": "Observation visibility: -",
         "location": {
           "startingColumn": 38,
-          "startingLine": 99
+          "startingLine": 132
         }
       },
       {
@@ -311,7 +335,7 @@
         "key": "Observation station: %@ %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 87
+          "startingLine": 120
         }
       },
       {
@@ -319,7 +343,7 @@
         "key": "Observation timestamp: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 88
+          "startingLine": 121
         }
       },
       {
@@ -327,7 +351,7 @@
         "key": "Observation raw visibility: %@ %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 89
+          "startingLine": 122
         }
       },
       {
@@ -335,7 +359,7 @@
         "key": "Observation raw source path: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 90
+          "startingLine": 123
         }
       },
       {
@@ -343,7 +367,7 @@
         "key": "Observation raw source object: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 91
+          "startingLine": 124
         }
       },
       {
@@ -351,7 +375,7 @@
         "key": "Observation visibility meters: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 92
+          "startingLine": 125
         }
       },
       {
@@ -359,7 +383,7 @@
         "key": "Observation visibility miles: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 93
+          "startingLine": 126
         }
       },
       {
@@ -367,7 +391,7 @@
         "key": "Observation age minutes: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 94
+          "startingLine": 127
         }
       },
       {
@@ -375,7 +399,7 @@
         "key": "Observation visibility usable: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 95
+          "startingLine": 128
         }
       },
       {
@@ -383,7 +407,7 @@
         "key": "Observation station URL: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 96
+          "startingLine": 129
         }
       },
       {
@@ -391,7 +415,7 @@
         "key": "Latest observation URL: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 97
+          "startingLine": 130
         }
       },
       {
@@ -399,7 +423,7 @@
         "key": "recommendedVisibilitySourceForBlock1: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 101
+          "startingLine": 134
         }
       },
       {
@@ -407,7 +431,7 @@
         "key": "Visibility comparison note: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 102
+          "startingLine": 135
         }
       },
       {
@@ -415,7 +439,7 @@
         "key": "Slot anchor unix: %lld",
         "location": {
           "startingColumn": 34,
-          "startingLine": 103
+          "startingLine": 136
         }
       },
       {
@@ -423,7 +447,7 @@
         "key": "Fetch error: %@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 114
+          "startingLine": 147
         }
       },
       {
@@ -431,7 +455,7 @@
         "key": "Slot +%lldm tempC=%@ windKmh=%@ gustKmh=%@ pop=%@ visM=%@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 106
+          "startingLine": 139
         }
       },
       {
@@ -439,7 +463,7 @@
         "key": "Temp rule: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 107
+          "startingLine": 140
         }
       },
       {
@@ -447,7 +471,7 @@
         "key": "Wind rule: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 108
+          "startingLine": 141
         }
       },
       {
@@ -455,7 +479,7 @@
         "key": "Gust rule: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 109
+          "startingLine": 142
         }
       },
       {
@@ -463,7 +487,7 @@
         "key": "PoP rule: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 110
+          "startingLine": 143
         }
       },
       {
@@ -471,7 +495,7 @@
         "key": "Vis rule: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 111
+          "startingLine": 144
         }
       },
       {
@@ -479,7 +503,7 @@
         "key": "Sequence: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 122
+          "startingLine": 155
         }
       },
       {
@@ -487,7 +511,7 @@
         "key": "Field anchor unix: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 123
+          "startingLine": 156
         }
       },
       {
@@ -495,7 +519,7 @@
         "key": "Field generation unix: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 124
+          "startingLine": 157
         }
       },
       {
@@ -503,7 +527,7 @@
         "key": "Center lat_e5: %d",
         "location": {
           "startingColumn": 26,
-          "startingLine": 125
+          "startingLine": 158
         }
       },
       {
@@ -511,7 +535,7 @@
         "key": "Center lon_e5: %d",
         "location": {
           "startingColumn": 26,
-          "startingLine": 126
+          "startingLine": 159
         }
       },
       {
@@ -519,7 +543,7 @@
         "key": "Field width mi: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 127
+          "startingLine": 160
         }
       },
       {
@@ -527,7 +551,7 @@
         "key": "Field height mi: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 128
+          "startingLine": 161
         }
       },
       {
@@ -535,7 +559,7 @@
         "key": "Grid rows: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 129
+          "startingLine": 162
         }
       },
       {
@@ -543,7 +567,7 @@
         "key": "Grid cols: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 130
+          "startingLine": 163
         }
       },
       {
@@ -551,7 +575,7 @@
         "key": "Slot count: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 131
+          "startingLine": 164
         }
       },
       {
@@ -559,7 +583,7 @@
         "key": "Reserved0: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 132
+          "startingLine": 165
         }
       },
       {
@@ -567,7 +591,7 @@
         "key": "Forecast horizon min: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 133
+          "startingLine": 166
         }
       },
       {
@@ -575,7 +599,7 @@
         "key": "Source age min: %u",
         "location": {
           "startingColumn": 26,
-          "startingLine": 134
+          "startingLine": 167
         }
       },
       {
@@ -583,7 +607,7 @@
         "key": "Packet byte length: %lld",
         "location": {
           "startingColumn": 26,
-          "startingLine": 135
+          "startingLine": 168
         }
       },
       {
@@ -591,7 +615,7 @@
         "key": "Packet length valid: %@",
         "location": {
           "startingColumn": 26,
-          "startingLine": 136
+          "startingLine": 169
         }
       },
       {
@@ -599,7 +623,7 @@
         "key": "Packet hex preview: %@",
         "location": {
           "startingColumn": 26,
-          "startingLine": 137
+          "startingLine": 170
         }
       },
       {
@@ -607,7 +631,7 @@
         "key": "Packet Anchor %@",
         "location": {
           "startingColumn": 29,
-          "startingLine": 147
+          "startingLine": 180
         }
       },
       {
@@ -615,7 +639,7 @@
         "key": "Coordinate: %@",
         "location": {
           "startingColumn": 30,
-          "startingLine": 148
+          "startingLine": 181
         }
       },
       {
@@ -623,7 +647,7 @@
         "key": "Slot +%lldm slotOffsetMin=%u airTempCTenths=%d windSpeedMpsTenths=%u windGustMpsTenths=%u precipProbPct=%u precipKind=%@ precipIntensity=%@ reserved0=%u visibilitySource=%@ visibilitySourceMeters=%@ visibilityM=%u hazardFlags=%@",
         "location": {
           "startingColumn": 34,
-          "startingLine": 151
+          "startingLine": 184
         }
       },
       {
@@ -631,7 +655,7 @@
         "key": "Note: %@",
         "location": {
           "startingColumn": 38,
-          "startingLine": 153
+          "startingLine": 186
         }
       }
     ]
