@@ -121,7 +121,7 @@ final class NOAAClient {
 
     func fetchThreeByThreeField(centerLatitude: Double, centerLongitude: Double) async -> ThreeByThreeWeatherFieldDebugData {
         let center = WeatherFieldCenter(latitude: centerLatitude, longitude: centerLongitude)
-        let anchors = Self.makeAnchorCoordinates(center: center)
+        let anchors = Block1FieldGeometry.makeAnchorCoordinates(center: center)
         let fieldAnchorDate = Date()
 
         print(
@@ -269,48 +269,6 @@ final class NOAAClient {
             snapshot: snapshot,
             threeSlotModel: threeSlotModel
         )
-    }
-
-    private static func makeAnchorCoordinates(center: WeatherFieldCenter) -> [WeatherFieldAnchorCoordinate] {
-        let orderedOffsets: [(row: Int, column: Int, northMultiplier: Double, eastMultiplier: Double)] = [
-            (0, 0, 1, -1),
-            (0, 1, 1, 0),
-            (0, 2, 1, 1),
-            (1, 0, 0, -1),
-            (1, 1, 0, 0),
-            (1, 2, 0, 1),
-            (2, 0, -1, -1),
-            (2, 1, -1, 0),
-            (2, 2, -1, 1)
-        ]
-
-        return orderedOffsets.map { offset in
-            let coordinate = offsetCoordinate(
-                latitude: center.latitude,
-                longitude: center.longitude,
-                northMeters: offset.northMultiplier * Block1FieldGeometry.anchorSpacingMeters,
-                eastMeters: offset.eastMultiplier * Block1FieldGeometry.anchorSpacingMeters
-            )
-
-            return WeatherFieldAnchorCoordinate(
-                row: offset.row,
-                column: offset.column,
-                latitude: coordinate.latitude,
-                longitude: coordinate.longitude
-            )
-        }
-    }
-
-    private static func offsetCoordinate(
-        latitude: Double,
-        longitude: Double,
-        northMeters: Double,
-        eastMeters: Double
-    ) -> (latitude: Double, longitude: Double) {
-        let latitudeDelta = northMeters / 111_320
-        let longitudeMetersPerDegree = max(1, 111_320 * cos(latitude * .pi / 180))
-        let longitudeDelta = eastMeters / longitudeMetersPerDegree
-        return (latitude + latitudeDelta, longitude + longitudeDelta)
     }
 
     private func makePointsURL(latitude: Double, longitude: Double) throws -> URL {

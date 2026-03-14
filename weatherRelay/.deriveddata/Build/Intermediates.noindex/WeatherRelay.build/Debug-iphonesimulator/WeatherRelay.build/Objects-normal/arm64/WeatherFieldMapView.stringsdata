@@ -1,0 +1,72 @@
+{
+  "source": "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/WeatherRelay/WeatherRelay/WeatherFieldMapView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Weather Field Map",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 110
+        }
+      },
+      {
+        "comment": "",
+        "key": "Fetch NOAA 3x3 Field from Weather Debug first.",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 105
+        }
+      },
+      {
+        "comment": "",
+        "key": "Center %@, %@ | slot +%lldm",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 55
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Weather Field Yet",
+        "location": {
+          "startingColumn": 21,
+          "startingLine": 103
+        }
+      },
+      {
+        "comment": "",
+        "key": "Slot",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 64
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld min",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "Anchor Summary",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 87
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ windMph=%@ visibility=%@ missing=%@",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 90
+        }
+      }
+    ]
+  },
+  "version": 1
+}

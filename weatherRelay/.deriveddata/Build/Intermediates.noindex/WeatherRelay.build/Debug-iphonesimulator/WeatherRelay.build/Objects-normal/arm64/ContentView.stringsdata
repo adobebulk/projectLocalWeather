@@ -44,10 +44,18 @@
       },
       {
         "comment": "",
+        "key": "Weather Field Map",
+        "location": {
+          "startingColumn": 36,
+          "startingLine": 103
+        }
+      },
+      {
+        "comment": "",
         "key": "Enable Background Location",
         "location": {
           "startingColumn": 32,
-          "startingLine": 104
+          "startingLine": 109
         }
       },
       {

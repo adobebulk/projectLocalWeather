@@ -100,6 +100,11 @@ struct ContentView: View {
                     }
                     .buttonStyle(.bordered)
 
+                    NavigationLink("Weather Field Map") {
+                        WeatherFieldMapView(viewModel: weatherDebugViewModel)
+                    }
+                    .buttonStyle(.bordered)
+
                     if locationManager.canRequestAlwaysAuthorization {
                         Button("Enable Background Location") {
                             locationManager.requestAlwaysAuthorizationIfPossible()
