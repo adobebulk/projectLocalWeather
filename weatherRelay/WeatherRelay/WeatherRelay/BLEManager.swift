@@ -61,6 +61,11 @@ final class BLEManager: NSObject, ObservableObject {
     private var nextSequenceNumber: UInt32 = 202
     private var pendingPositionSequence: UInt32?
     private var pendingPositionTrigger: String?
+    private var pendingWeatherSequence: UInt32?
+    private var pendingWeatherChunkQueue: [Data] = []
+    private var pendingWeatherChunkWriteType: CBCharacteristicWriteType?
+    private var pendingWeatherChunkIndex = 0
+    private var pendingWeatherChunkTotal = 0
 
     private let positionSendInterval: TimeInterval = 10 * 60
     private let autoSendMaximumFixAge: TimeInterval = 60
@@ -133,6 +138,15 @@ final class BLEManager: NSObject, ObservableObject {
                 """
             )
         }
+        if let pendingWeatherSequence {
+            print(
+                """
+                BLEManager: clearing pending weather state for new scan \
+                sequence=\(pendingWeatherSequence) \
+                remainingChunks=\(pendingWeatherChunkQueue.count)
+                """
+            )
+        }
         didFindDevice = false
         isConnected = false
         didDiscoverService = false
@@ -149,10 +163,82 @@ final class BLEManager: NSObject, ObservableObject {
         txCharacteristic = nil
         pendingPositionSequence = nil
         pendingPositionTrigger = nil
+        pendingWeatherSequence = nil
+        pendingWeatherChunkQueue = []
+        pendingWeatherChunkWriteType = nil
+        pendingWeatherChunkIndex = 0
+        pendingWeatherChunkTotal = 0
     }
 
     func sendPositionPacket(locationFix: LocationManager.LocationFix?) {
         sendPositionPacket(locationFix: locationFix, trigger: "manual")
+    }
+
+    func sendRegionalSnapshotV1Debug(_ packetDebug: RegionalSnapshotPacketDebugData) {
+        guard packetDebug.isPacketLengthValid else {
+            print("BLEManager: RegionalSnapshotV1 send skipped - packetLength=\(packetDebug.packetByteLength) expected=\(RegionalSnapshotBuilder.regionalSnapshotPacketSize)")
+            return
+        }
+
+        guard isConnected && didDiscoverCharacteristics else {
+            print("BLEManager: RegionalSnapshotV1 send skipped - BLE not ready")
+            return
+        }
+
+        guard pendingWeatherChunkQueue.isEmpty else {
+            print("BLEManager: RegionalSnapshotV1 send skipped - weather transfer already in progress sequence=\(pendingWeatherSequence.map(String.init) ?? "none")")
+            return
+        }
+
+        guard pendingPositionSequence == nil else {
+            print("BLEManager: RegionalSnapshotV1 send skipped - position packet awaiting ACK sequence=\(pendingPositionSequence.map(String.init) ?? "none")")
+            return
+        }
+
+        guard let peripheral = targetPeripheral, let rxCharacteristic else {
+            print("BLEManager: RegionalSnapshotV1 send skipped - peripheral or RX characteristic unavailable")
+            return
+        }
+
+        let writeType: CBCharacteristicWriteType =
+            rxCharacteristic.properties.contains(.write) ? .withResponse : .withoutResponse
+        let writeTypeDescription = writeType == .withResponse ? "withResponse" : "withoutResponse"
+        let peripheralMax = peripheral.maximumWriteValueLength(for: writeType)
+        let chunkSize = max(1, min(peripheralMax, 180))
+        let chunks = packetDebug.packet.chunked(into: chunkSize)
+
+        pendingWeatherSequence = packetDebug.sequence
+        pendingWeatherChunkQueue = chunks
+        pendingWeatherChunkWriteType = writeType
+        pendingWeatherChunkIndex = 0
+        pendingWeatherChunkTotal = chunks.count
+        lastSentPacketHex = packetDebug.packetHexPreview
+
+        print(
+            """
+            BLEManager: starting RegionalSnapshotV1 send \
+            sequence=\(packetDebug.sequence) \
+            totalLength=\(packetDebug.packet.count) \
+            chunkCount=\(chunks.count) \
+            chunkSize=\(chunkSize) \
+            peripheralMaxWriteLength=\(peripheralMax) \
+            writeType=\(writeTypeDescription)
+            """
+        )
+
+        if writeType == .withResponse {
+            writeNextWeatherChunk()
+        } else {
+            for chunkIndex in chunks.indices {
+                let chunk = chunks[chunkIndex]
+                print("BLEManager: sending RegionalSnapshotV1 chunk \(chunkIndex + 1)/\(chunks.count) bytes=\(chunk.count)")
+                peripheral.writeValue(chunk, for: rxCharacteristic, type: writeType)
+            }
+            pendingWeatherChunkQueue = []
+            pendingWeatherChunkWriteType = nil
+            pendingWeatherChunkIndex = chunks.count
+            print("BLEManager: RegionalSnapshotV1 chunks queued withoutResponse awaiting ACK sequence=\(packetDebug.sequence)")
+        }
     }
 
     func considerPositionSendIfDue(locationFix: LocationManager.LocationFix?, trigger: String) {
@@ -272,12 +358,35 @@ final class BLEManager: NSObject, ObservableObject {
             return
         }
 
+        guard pendingWeatherChunkQueue.isEmpty else {
+            print("BLEManager: \(label) write skipped - RX busy with RegionalSnapshotV1 chunk transfer")
+            return
+        }
+
         let writeType: CBCharacteristicWriteType =
             rxCharacteristic.properties.contains(.write) ? .withResponse : .withoutResponse
         let writeTypeDescription = writeType == .withResponse ? "withResponse" : "withoutResponse"
 
         print("BLEManager: writing \(label) hex=\(payload.hexString) using \(writeTypeDescription)")
         peripheral.writeValue(payload, for: rxCharacteristic, type: writeType)
+    }
+
+    private func writeNextWeatherChunk() {
+        guard let peripheral = targetPeripheral, let rxCharacteristic else {
+            print("BLEManager: RegionalSnapshotV1 chunk send aborted - peripheral or RX characteristic unavailable")
+            pendingWeatherChunkQueue = []
+            pendingWeatherChunkWriteType = nil
+            return
+        }
+
+        guard let writeType = pendingWeatherChunkWriteType, !pendingWeatherChunkQueue.isEmpty else {
+            return
+        }
+
+        let chunk = pendingWeatherChunkQueue.removeFirst()
+        pendingWeatherChunkIndex += 1
+        print("BLEManager: sending RegionalSnapshotV1 chunk \(pendingWeatherChunkIndex)/\(pendingWeatherChunkTotal) bytes=\(chunk.count)")
+        peripheral.writeValue(chunk, for: rxCharacteristic, type: writeType)
     }
 }
 
@@ -534,6 +643,19 @@ extension BLEManager: CBPeripheralDelegate {
                 )
                 pendingPositionSequence = nil
                 pendingPositionTrigger = nil
+            } else if ack.status == .ok, ack.sequence == pendingWeatherSequence {
+                print(
+                    """
+                    BLEManager: RegionalSnapshotV1 send accepted \
+                    sequence=\(ack.sequence) \
+                    activeWeatherTimestamp=\(ack.weatherTimestamp)
+                    """
+                )
+                pendingWeatherSequence = nil
+                pendingWeatherChunkQueue = []
+                pendingWeatherChunkWriteType = nil
+                pendingWeatherChunkIndex = 0
+                pendingWeatherChunkTotal = 0
             } else if ack.sequence == pendingPositionSequence {
                 print(
                     """
@@ -545,13 +667,27 @@ extension BLEManager: CBPeripheralDelegate {
                 )
                 pendingPositionSequence = nil
                 pendingPositionTrigger = nil
+            } else if ack.sequence == pendingWeatherSequence {
+                print(
+                    """
+                    BLEManager: RegionalSnapshotV1 send not accepted \
+                    status=\(ack.status) \
+                    sequence=\(ack.sequence)
+                    """
+                )
+                pendingWeatherSequence = nil
+                pendingWeatherChunkQueue = []
+                pendingWeatherChunkWriteType = nil
+                pendingWeatherChunkIndex = 0
+                pendingWeatherChunkTotal = 0
             } else {
                 print(
                     """
-                    BLEManager: ack sequence does not match pending position send \
+                    BLEManager: ack sequence does not match pending send \
                     ackSequence=\(ack.sequence) \
-                    pendingSequence=\(pendingPositionSequence.map(String.init) ?? "none") \
-                    pendingTrigger=\(pendingPositionTrigger ?? "none")
+                    pendingPositionSequence=\(pendingPositionSequence.map(String.init) ?? "none") \
+                    pendingPositionTrigger=\(pendingPositionTrigger ?? "none") \
+                    pendingWeatherSequence=\(pendingWeatherSequence.map(String.init) ?? "none")
                     """
                 )
             }
@@ -565,6 +701,14 @@ extension BLEManager: CBPeripheralDelegate {
                     error: Error?) {
         if let error {
             print("BLEManager: write failed for \(characteristic.uuid.uuidString) error=\(error.localizedDescription)")
+            if !pendingWeatherChunkQueue.isEmpty || pendingWeatherChunkIndex > 0 {
+                print("BLEManager: RegionalSnapshotV1 chunk send aborted after write failure")
+                pendingWeatherChunkQueue = []
+                pendingWeatherChunkWriteType = nil
+                pendingWeatherChunkIndex = 0
+                pendingWeatherChunkTotal = 0
+                pendingWeatherSequence = nil
+            }
             return
         }
 
@@ -573,9 +717,22 @@ extension BLEManager: CBPeripheralDelegate {
             BLEManager: write completed \
             characteristic=\(characteristic.uuid.uuidString) \
             pendingSequence=\(pendingPositionSequence.map(String.init) ?? "none") \
-            pendingTrigger=\(pendingPositionTrigger ?? "none")
+            pendingTrigger=\(pendingPositionTrigger ?? "none") \
+            pendingWeatherSequence=\(pendingWeatherSequence.map(String.init) ?? "none") \
+            weatherChunkProgress=\(pendingWeatherChunkIndex)/\(pendingWeatherChunkTotal)
             """
         )
+
+        if pendingWeatherChunkWriteType == .withResponse, characteristic.uuid == Self.rxCharacteristicUUID {
+            if !pendingWeatherChunkQueue.isEmpty {
+                writeNextWeatherChunk()
+            } else if pendingWeatherChunkTotal > 0 {
+                print("BLEManager: RegionalSnapshotV1 chunk transfer complete awaiting ACK sequence=\(pendingWeatherSequence.map(String.init) ?? "none")")
+                pendingWeatherChunkWriteType = nil
+                pendingWeatherChunkIndex = 0
+                pendingWeatherChunkTotal = 0
+            }
+        }
     }
 }
 
@@ -639,5 +796,22 @@ private extension CBCharacteristicProperties {
 private extension Data {
     var hexString: String {
         map { String(format: "%02X", $0) }.joined(separator: " ")
+    }
+
+    func chunked(into chunkSize: Int) -> [Data] {
+        guard chunkSize > 0 else {
+            return [self]
+        }
+
+        var chunks: [Data] = []
+        var offset = startIndex
+
+        while offset < endIndex {
+            let nextOffset = index(offset, offsetBy: chunkSize, limitedBy: endIndex) ?? endIndex
+            chunks.append(self[offset..<nextOffset])
+            offset = nextOffset
+        }
+
+        return chunks
     }
 }

@@ -40,7 +40,7 @@ struct WeatherDebugView: View {
                 Button("Send RegionalSnapshotV1") {
                     if let packetDebug = viewModel.latestRegionalSnapshotPacketDebug {
                         if packetDebug.isPacketLengthValid {
-                            print("WeatherDebugView: RegionalSnapshotV1 BLE send intentionally disabled until dedicated transmit pass")
+                            bleManager.sendRegionalSnapshotV1Debug(packetDebug)
                         } else {
                             print("WeatherDebugView: RegionalSnapshotV1 send blocked packetLength=\(packetDebug.packetByteLength) expected=\(RegionalSnapshotBuilder.regionalSnapshotPacketSize)")
                         }
