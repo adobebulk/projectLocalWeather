@@ -7,7 +7,7 @@
         "key": "Weather Debug",
         "location": {
           "startingColumn": 26,
-          "startingLine": 101
+          "startingLine": 86
         }
       },
       {
@@ -28,7 +28,7 @@
       },
       {
         "comment": "",
-        "key": "NOAA Point Resolution",
+        "key": "3x3 Field Summary",
         "location": {
           "startingColumn": 25,
           "startingLine": 43
@@ -36,34 +36,10 @@
       },
       {
         "comment": "",
-        "key": "Selected Raw NOAA Values",
-        "location": {
-          "startingColumn": 25,
-          "startingLine": 52
-        }
-      },
-      {
-        "comment": "",
-        "key": "Normalized Snapshot",
-        "location": {
-          "startingColumn": 25,
-          "startingLine": 62
-        }
-      },
-      {
-        "comment": "",
-        "key": "Derived 3-Slot Model",
-        "location": {
-          "startingColumn": 25,
-          "startingLine": 72
-        }
-      },
-      {
-        "comment": "",
         "key": "Last Error",
         "location": {
           "startingColumn": 25,
-          "startingLine": 96
+          "startingLine": 81
         }
       },
       {
@@ -76,7 +52,7 @@
       },
       {
         "comment": "",
-        "key": "Current fix: %@",
+        "key": "Field center: %@",
         "location": {
           "startingColumn": 22,
           "startingLine": 26
@@ -92,7 +68,7 @@
       },
       {
         "comment": "",
-        "key": "Fetch NOAA Weather",
+        "key": "Fetch NOAA 3x3 Field",
         "location": {
           "startingColumn": 62,
           "startingLine": 27
@@ -132,7 +108,7 @@
       },
       {
         "comment": "",
-        "key": "CWA: %@",
+        "key": "Center latitude: %@",
         "location": {
           "startingColumn": 26,
           "startingLine": 44
@@ -140,7 +116,7 @@
       },
       {
         "comment": "",
-        "key": "Grid ID: %@",
+        "key": "Center longitude: %@",
         "location": {
           "startingColumn": 26,
           "startingLine": 45
@@ -148,7 +124,7 @@
       },
       {
         "comment": "",
-        "key": "Grid X: %lld",
+        "key": "Anchor spacing meters: %lld",
         "location": {
           "startingColumn": 26,
           "startingLine": 46
@@ -156,7 +132,7 @@
       },
       {
         "comment": "",
-        "key": "Grid Y: %lld",
+        "key": "Anchors fetched: %lld",
         "location": {
           "startingColumn": 26,
           "startingLine": 47
@@ -164,226 +140,146 @@
       },
       {
         "comment": "",
+        "key": "Anchor %@",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 51
+        }
+      },
+      {
+        "comment": "",
+        "key": "Coordinate: %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 52
+        }
+      },
+      {
+        "comment": "",
+        "key": "CWA: %@",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 55
+        }
+      },
+      {
+        "comment": "",
+        "key": "Grid ID: %@",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 56
+        }
+      },
+      {
+        "comment": "",
+        "key": "Grid X: %lld",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 57
+        }
+      },
+      {
+        "comment": "",
+        "key": "Grid Y: %lld",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 58
+        }
+      },
+      {
+        "comment": "",
         "key": "forecastGridData: %@",
         "location": {
-          "startingColumn": 26,
-          "startingLine": 48
+          "startingColumn": 34,
+          "startingLine": 59
         }
       },
       {
         "comment": "",
         "key": "Fetched at: %lld",
         "location": {
-          "startingColumn": 26,
-          "startingLine": 49
-        }
-      },
-      {
-        "comment": "",
-        "key": "%@: value=%@ unit=%@ validTime=%@",
-        "location": {
-          "startingColumn": 18,
-          "startingLine": 127
-        }
-      },
-      {
-        "comment": "",
-        "key": "%@: -",
-        "location": {
-          "startingColumn": 18,
-          "startingLine": 129
-        }
-      },
-      {
-        "comment": "",
-        "key": "%@: %@ validTime=%@",
-        "location": {
-          "startingColumn": 18,
-          "startingLine": 136
-        }
-      },
-      {
-        "comment": "",
-        "key": "%@: -",
-        "location": {
-          "startingColumn": 18,
-          "startingLine": 138
-        }
-      },
-      {
-        "comment": "",
-        "key": "Temperature C: %@",
-        "location": {
-          "startingColumn": 26,
-          "startingLine": 63
-        }
-      },
-      {
-        "comment": "",
-        "key": "Wind Speed km/h: %@",
-        "location": {
-          "startingColumn": 26,
-          "startingLine": 64
-        }
-      },
-      {
-        "comment": "",
-        "key": "Wind Gust km/h: %@",
-        "location": {
-          "startingColumn": 26,
-          "startingLine": 65
-        }
-      },
-      {
-        "comment": "",
-        "key": "Precip %%: %@",
-        "location": {
-          "startingColumn": 26,
-          "startingLine": 66
-        }
-      },
-      {
-        "comment": "",
-        "key": "Visibility m: %@",
-        "location": {
-          "startingColumn": 26,
-          "startingLine": 67
+          "startingColumn": 34,
+          "startingLine": 60
         }
       },
       {
         "comment": "",
         "key": "Weather Summary: %@",
         "location": {
-          "startingColumn": 26,
-          "startingLine": 68
+          "startingColumn": 34,
+          "startingLine": 61
         }
       },
       {
         "comment": "",
         "key": "Hazard Summary: %@",
         "location": {
-          "startingColumn": 26,
-          "startingLine": 69
+          "startingColumn": 34,
+          "startingLine": 62
         }
       },
       {
         "comment": "",
-        "key": "Anchor Unix: %lld",
+        "key": "Slot anchor unix: %lld",
         "location": {
-          "startingColumn": 26,
-          "startingLine": 73
+          "startingColumn": 34,
+          "startingLine": 63
         }
       },
       {
         "comment": "",
-        "key": "Slot duration minutes: %lld",
+        "key": "Fetch error: %@",
         "location": {
-          "startingColumn": 26,
+          "startingColumn": 34,
           "startingLine": 74
         }
       },
       {
         "comment": "",
-        "key": "Slot +%lld min",
+        "key": "Slot +%lldm tempC=%@ windKmh=%@ gustKmh=%@ pop=%@ visM=%@",
         "location": {
-          "startingColumn": 29,
-          "startingLine": 78
+          "startingColumn": 38,
+          "startingLine": 66
         }
       },
       {
         "comment": "",
-        "key": "Start Unix: %lld",
+        "key": "Temp rule: %@",
         "location": {
-          "startingColumn": 30,
-          "startingLine": 79
+          "startingColumn": 38,
+          "startingLine": 67
         }
       },
       {
         "comment": "",
-        "key": "End Unix: %lld",
+        "key": "Wind rule: %@",
         "location": {
-          "startingColumn": 30,
-          "startingLine": 80
+          "startingColumn": 38,
+          "startingLine": 68
         }
       },
       {
         "comment": "",
-        "key": "Temperature C: %@",
+        "key": "Gust rule: %@",
         "location": {
-          "startingColumn": 30,
-          "startingLine": 81
+          "startingColumn": 38,
+          "startingLine": 69
         }
       },
       {
         "comment": "",
-        "key": "Temperature rule: %@",
+        "key": "PoP rule: %@",
         "location": {
-          "startingColumn": 30,
-          "startingLine": 82
+          "startingColumn": 38,
+          "startingLine": 70
         }
       },
       {
         "comment": "",
-        "key": "Wind Speed km/h: %@",
+        "key": "Vis rule: %@",
         "location": {
-          "startingColumn": 30,
-          "startingLine": 83
-        }
-      },
-      {
-        "comment": "",
-        "key": "Wind Speed rule: %@",
-        "location": {
-          "startingColumn": 30,
-          "startingLine": 84
-        }
-      },
-      {
-        "comment": "",
-        "key": "Wind Gust km/h: %@",
-        "location": {
-          "startingColumn": 30,
-          "startingLine": 85
-        }
-      },
-      {
-        "comment": "",
-        "key": "Wind Gust rule: %@",
-        "location": {
-          "startingColumn": 30,
-          "startingLine": 86
-        }
-      },
-      {
-        "comment": "",
-        "key": "Precip %%: %@",
-        "location": {
-          "startingColumn": 30,
-          "startingLine": 87
-        }
-      },
-      {
-        "comment": "",
-        "key": "Precip rule: %@",
-        "location": {
-          "startingColumn": 30,
-          "startingLine": 88
-        }
-      },
-      {
-        "comment": "",
-        "key": "Visibility m: %@",
-        "location": {
-          "startingColumn": 30,
-          "startingLine": 89
-        }
-      },
-      {
-        "comment": "",
-        "key": "Visibility rule: %@",
-        "location": {
-          "startingColumn": 30,
-          "startingLine": 90
+          "startingColumn": 38,
+          "startingLine": 71
         }
       }
     ]

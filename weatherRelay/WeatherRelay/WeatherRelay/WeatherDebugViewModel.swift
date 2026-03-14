@@ -12,7 +12,7 @@ import Combine
 final class WeatherDebugViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var lastErrorMessage: String?
-    @Published var latestWeatherData: NOAAOnePointWeatherDebugData?
+    @Published var latestFieldWeatherData: ThreeByThreeWeatherFieldDebugData?
 
     private let noaaClient: NOAAClient
 
@@ -40,24 +40,21 @@ final class WeatherDebugViewModel: ObservableObject {
             """
         )
 
-        do {
-            let weatherData = try await noaaClient.fetchOnePointWeather(
-                latitude: locationFix.latitude,
-                longitude: locationFix.longitude
-            )
-            latestWeatherData = weatherData
-            print(
-                """
-                WeatherDebugViewModel: NOAA fetch completed \
-                fetchedAtUnix=\(Int(weatherData.fetchedAt.timeIntervalSince1970)) \
-                gridId=\(weatherData.pointInfo.gridId) \
-                gridX=\(weatherData.pointInfo.gridX) \
-                gridY=\(weatherData.pointInfo.gridY)
-                """
-            )
-        } catch {
-            lastErrorMessage = error.localizedDescription
-            print("WeatherDebugViewModel: NOAA fetch failed error=\(error.localizedDescription)")
+        let weatherData = await noaaClient.fetchThreeByThreeField(
+            centerLatitude: locationFix.latitude,
+            centerLongitude: locationFix.longitude
+        )
+        latestFieldWeatherData = weatherData
+        print(
+            """
+            WeatherDebugViewModel: NOAA 3x3 fetch completed \
+            centerLat=\(weatherData.center.latitude) \
+            centerLon=\(weatherData.center.longitude) \
+            anchors=\(weatherData.anchorResults.count)
+            """
+        )
+        if weatherData.anchorResults.allSatisfy({ $0.weatherData == nil }) {
+            lastErrorMessage = "All 9 NOAA anchor fetches failed"
         }
 
         isLoading = false

@@ -106,6 +106,16 @@
     "swift-dependencies" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherDebugViewModel.swiftdeps",
     "swiftmodule" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherDebugViewModel~partial.swiftmodule"
   },
+  "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/WeatherRelay/WeatherRelay/WeatherFieldModel.swift" : {
+    "const-values" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherFieldModel.swiftconstvalues",
+    "dependencies" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherFieldModel.d",
+    "diagnostics" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherFieldModel.dia",
+    "index-unit-output-path" : "/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherFieldModel.o",
+    "llvm-bc" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherFieldModel.bc",
+    "object" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherFieldModel.o",
+    "swift-dependencies" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherFieldModel.swiftdeps",
+    "swiftmodule" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherFieldModel~partial.swiftmodule"
+  },
   "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/WeatherRelay/WeatherRelay/WeatherRelayApp.swift" : {
     "const-values" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherRelayApp.swiftconstvalues",
     "dependencies" : "/Users/smith/Documents/Personal/Projects/localWeather/weatherRelay/.deriveddata/Build/Intermediates.noindex/WeatherRelay.build/Debug-iphonesimulator/WeatherRelay.build/Objects-normal/arm64/WeatherRelayApp.d",

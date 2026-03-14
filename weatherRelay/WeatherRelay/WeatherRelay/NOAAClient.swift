@@ -103,14 +103,94 @@ final class NOAAClient {
     }
 
     func fetchOnePointWeather(latitude: Double, longitude: Double) async throws -> NOAAOnePointWeatherDebugData {
+        try await fetchAnchorWeather(latitude: latitude, longitude: longitude, logPrefix: "NOAAClient")
+    }
+
+    func fetchThreeByThreeField(centerLatitude: Double, centerLongitude: Double) async -> ThreeByThreeWeatherFieldDebugData {
+        let center = WeatherFieldCenter(latitude: centerLatitude, longitude: centerLongitude)
+        let anchors = Self.makeAnchorCoordinates(center: center)
+
+        print(
+            """
+            NOAAClient: starting 3x3 field fetch \
+            centerLat=\(centerLatitude) \
+            centerLon=\(centerLongitude) \
+            anchorSpacingMeters=\(Int(Block1FieldGeometry.anchorSpacingMeters))
+            """
+        )
+
+        let anchorResults = await withTaskGroup(of: WeatherFieldAnchorResult.self) { group in
+            for anchor in anchors {
+                group.addTask { [self] in
+                    let label = anchor.label
+                    do {
+                        print(
+                            """
+                            NOAAClient: anchor fetch start \
+                            anchor=\(label) \
+                            lat=\(anchor.latitude) \
+                            lon=\(anchor.longitude)
+                            """
+                        )
+                        let weatherData = try await fetchAnchorWeather(
+                            latitude: anchor.latitude,
+                            longitude: anchor.longitude,
+                            logPrefix: "NOAAClient[\(label)]"
+                        )
+                        return WeatherFieldAnchorResult(
+                            anchor: anchor,
+                            fetchedAt: weatherData.fetchedAt,
+                            weatherData: weatherData,
+                            errorMessage: nil
+                        )
+                    } catch {
+                        print("NOAAClient: anchor fetch failed anchor=\(label) error=\(error.localizedDescription)")
+                        return WeatherFieldAnchorResult(
+                            anchor: anchor,
+                            fetchedAt: nil,
+                            weatherData: nil,
+                            errorMessage: error.localizedDescription
+                        )
+                    }
+                }
+            }
+
+            var results: [WeatherFieldAnchorResult] = []
+            for await result in group {
+                results.append(result)
+            }
+
+            return results.sorted {
+                if $0.anchor.row == $1.anchor.row {
+                    return $0.anchor.column < $1.anchor.column
+                }
+
+                return $0.anchor.row < $1.anchor.row
+            }
+        }
+
+        print("NOAAClient: completed 3x3 field fetch anchors=\(anchorResults.count)")
+
+        return ThreeByThreeWeatherFieldDebugData(
+            center: center,
+            geometrySpacingMeters: Block1FieldGeometry.anchorSpacingMeters,
+            anchorResults: anchorResults
+        )
+    }
+
+    private func fetchAnchorWeather(
+        latitude: Double,
+        longitude: Double,
+        logPrefix: String
+    ) async throws -> NOAAOnePointWeatherDebugData {
         let pointsURL = try makePointsURL(latitude: latitude, longitude: longitude)
-        print("NOAAClient: fetching points url=\(pointsURL.absoluteString)")
+        print("\(logPrefix): fetching points url=\(pointsURL.absoluteString)")
         let pointsJSON = try await fetchJSONObject(from: pointsURL)
         let pointInfo = try parsePointInfo(from: pointsJSON, latitude: latitude, longitude: longitude)
 
         print(
             """
-            NOAAClient: resolved point \
+            \(logPrefix): resolved point \
             cwa=\(pointInfo.cwa) \
             gridId=\(pointInfo.gridId) \
             gridX=\(pointInfo.gridX) \
@@ -119,7 +199,7 @@ final class NOAAClient {
             """
         )
 
-        print("NOAAClient: fetching forecastGridData url=\(pointInfo.forecastGridDataURL.absoluteString)")
+        print("\(logPrefix): fetching forecastGridData url=\(pointInfo.forecastGridDataURL.absoluteString)")
         let gridJSON = try await fetchJSONObject(from: pointInfo.forecastGridDataURL)
         let forecastProperties = try parseForecastProperties(from: gridJSON)
         let fetchedAt = Date()
@@ -145,7 +225,7 @@ final class NOAAClient {
 
         print(
             """
-            NOAAClient: normalized snapshot \
+            \(logPrefix): normalized snapshot \
             temperatureC=\(snapshot.temperatureC.map(Self.formatDouble) ?? "nil") \
             windSpeedKmh=\(snapshot.windSpeedKmh.map(Self.formatDouble) ?? "nil") \
             windGustKmh=\(snapshot.windGustKmh.map(Self.formatDouble) ?? "nil") \
@@ -155,7 +235,7 @@ final class NOAAClient {
             hazardSummary=\(snapshot.hazardSummary ?? "nil")
             """
         )
-        Self.logThreeSlotModel(threeSlotModel)
+        Self.logThreeSlotModel(threeSlotModel, logPrefix: logPrefix)
 
         return NOAAOnePointWeatherDebugData(
             pointInfo: pointInfo,
@@ -170,6 +250,43 @@ final class NOAAClient {
             snapshot: snapshot,
             threeSlotModel: threeSlotModel
         )
+    }
+
+    private static func makeAnchorCoordinates(center: WeatherFieldCenter) -> [WeatherFieldAnchorCoordinate] {
+        let rowOffsets = [-1, 0, 1]
+        let columnOffsets = [-1, 0, 1]
+
+        return rowOffsets.flatMap { rowOffset in
+            columnOffsets.map { columnOffset in
+                let northOffsetMeters = Double(-rowOffset) * Block1FieldGeometry.anchorSpacingMeters
+                let eastOffsetMeters = Double(columnOffset) * Block1FieldGeometry.anchorSpacingMeters
+                let coordinate = offsetCoordinate(
+                    latitude: center.latitude,
+                    longitude: center.longitude,
+                    northMeters: northOffsetMeters,
+                    eastMeters: eastOffsetMeters
+                )
+
+                return WeatherFieldAnchorCoordinate(
+                    row: rowOffset + 1,
+                    column: columnOffset + 1,
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude
+                )
+            }
+        }
+    }
+
+    private static func offsetCoordinate(
+        latitude: Double,
+        longitude: Double,
+        northMeters: Double,
+        eastMeters: Double
+    ) -> (latitude: Double, longitude: Double) {
+        let latitudeDelta = northMeters / 111_320
+        let longitudeMetersPerDegree = max(1, 111_320 * cos(latitude * .pi / 180))
+        let longitudeDelta = eastMeters / longitudeMetersPerDegree
+        return (latitude + latitudeDelta, longitude + longitudeDelta)
     }
 
     private func makePointsURL(latitude: Double, longitude: Double) throws -> URL {
@@ -592,10 +709,10 @@ final class NOAAClient {
         return abs(midpoint.timeIntervalSince(date))
     }
 
-    private static func logThreeSlotModel(_ model: OnePointThreeSlotWeatherModel) {
+    private static func logThreeSlotModel(_ model: OnePointThreeSlotWeatherModel, logPrefix: String) {
         print(
             """
-            NOAAClient: derived three-slot model \
+            \(logPrefix): derived three-slot model \
             anchorUnix=\(Int(model.anchorDate.timeIntervalSince1970)) \
             slotDurationMinutes=\(model.slotDurationMinutes)
             """
@@ -604,7 +721,7 @@ final class NOAAClient {
         for slot in model.slots {
             print(
                 """
-                NOAAClient: slot offsetMinutes=\(slot.offsetMinutes) \
+                \(logPrefix): slot offsetMinutes=\(slot.offsetMinutes) \
                 startUnix=\(Int(slot.startDate.timeIntervalSince1970)) \
                 endUnix=\(Int(slot.endDate.timeIntervalSince1970)) \
                 temperatureC=\(slot.temperatureC.map(formatDouble) ?? "nil") \
@@ -614,11 +731,11 @@ final class NOAAClient {
                 visibilityMeters=\(slot.visibilityMeters.map(formatDouble) ?? "nil")
                 """
             )
-            print("NOAAClient: slot \(slot.offsetMinutes) temperature rule=\(slot.temperatureSelectionNote)")
-            print("NOAAClient: slot \(slot.offsetMinutes) windSpeed rule=\(slot.windSpeedSelectionNote)")
-            print("NOAAClient: slot \(slot.offsetMinutes) windGust rule=\(slot.windGustSelectionNote)")
-            print("NOAAClient: slot \(slot.offsetMinutes) precipitation rule=\(slot.precipitationSelectionNote)")
-            print("NOAAClient: slot \(slot.offsetMinutes) visibility rule=\(slot.visibilitySelectionNote)")
+            print("\(logPrefix): slot \(slot.offsetMinutes) temperature rule=\(slot.temperatureSelectionNote)")
+            print("\(logPrefix): slot \(slot.offsetMinutes) windSpeed rule=\(slot.windSpeedSelectionNote)")
+            print("\(logPrefix): slot \(slot.offsetMinutes) windGust rule=\(slot.windGustSelectionNote)")
+            print("\(logPrefix): slot \(slot.offsetMinutes) precipitation rule=\(slot.precipitationSelectionNote)")
+            print("\(logPrefix): slot \(slot.offsetMinutes) visibility rule=\(slot.visibilitySelectionNote)")
         }
     }
 

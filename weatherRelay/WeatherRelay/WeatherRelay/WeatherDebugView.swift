@@ -23,8 +23,8 @@ struct WeatherDebugView: View {
         List {
             Section("Controls") {
                 Text("Developer NOAA Debug")
-                Text("Current fix: \(requestCoordinateText)")
-                Button(viewModel.isLoading ? "Fetching..." : "Fetch NOAA Weather") {
+                Text("Field center: \(requestCoordinateText)")
+                Button(viewModel.isLoading ? "Fetching..." : "Fetch NOAA 3x3 Field") {
                     Task {
                         await viewModel.fetchWeather(for: locationManager.currentFix)
                     }
@@ -39,55 +39,40 @@ struct WeatherDebugView: View {
                 Text("Fix timestamp: \(fixTimestampText)")
             }
 
-            if let weatherData = viewModel.latestWeatherData {
-                Section("NOAA Point Resolution") {
-                    Text("CWA: \(weatherData.pointInfo.cwa)")
-                    Text("Grid ID: \(weatherData.pointInfo.gridId)")
-                    Text("Grid X: \(weatherData.pointInfo.gridX)")
-                    Text("Grid Y: \(weatherData.pointInfo.gridY)")
-                    Text("forecastGridData: \(weatherData.pointInfo.forecastGridDataURL.absoluteString)")
-                    Text("Fetched at: \(Int(weatherData.fetchedAt.timeIntervalSince1970))")
+            if let fieldData = viewModel.latestFieldWeatherData {
+                Section("3x3 Field Summary") {
+                    Text("Center latitude: \(String(format: "%.5f", fieldData.center.latitude))")
+                    Text("Center longitude: \(String(format: "%.5f", fieldData.center.longitude))")
+                    Text("Anchor spacing meters: \(Int(fieldData.geometrySpacingMeters))")
+                    Text("Anchors fetched: \(fieldData.anchorResults.count)")
                 }
 
-                Section("Selected Raw NOAA Values") {
-                    rawQuantitativeRow(title: "Temperature", value: weatherData.rawTemperature)
-                    rawQuantitativeRow(title: "Wind Speed", value: weatherData.rawWindSpeed)
-                    rawQuantitativeRow(title: "Wind Gust", value: weatherData.rawWindGust)
-                    rawQuantitativeRow(title: "PoP", value: weatherData.rawProbabilityOfPrecipitation)
-                    rawQuantitativeRow(title: "Visibility", value: weatherData.rawVisibility)
-                    rawTextRow(title: "Weather", value: weatherData.rawWeather)
-                    rawTextRow(title: "Hazards", value: weatherData.rawHazards)
-                }
+                ForEach(fieldData.anchorResults) { anchorResult in
+                    Section("Anchor \(anchorResult.anchor.label)") {
+                        Text("Coordinate: \(String(format: "%.5f, %.5f", anchorResult.anchor.latitude, anchorResult.anchor.longitude))")
 
-                Section("Normalized Snapshot") {
-                    Text("Temperature C: \(formattedDouble(weatherData.snapshot.temperatureC))")
-                    Text("Wind Speed km/h: \(formattedDouble(weatherData.snapshot.windSpeedKmh))")
-                    Text("Wind Gust km/h: \(formattedDouble(weatherData.snapshot.windGustKmh))")
-                    Text("Precip %: \(formattedDouble(weatherData.snapshot.precipitationProbabilityPercent))")
-                    Text("Visibility m: \(formattedDouble(weatherData.snapshot.visibilityMeters))")
-                    Text("Weather Summary: \(weatherData.snapshot.weatherSummary ?? "-")")
-                    Text("Hazard Summary: \(weatherData.snapshot.hazardSummary ?? "-")")
-                }
+                        if let weatherData = anchorResult.weatherData {
+                            Text("CWA: \(weatherData.pointInfo.cwa)")
+                            Text("Grid ID: \(weatherData.pointInfo.gridId)")
+                            Text("Grid X: \(weatherData.pointInfo.gridX)")
+                            Text("Grid Y: \(weatherData.pointInfo.gridY)")
+                            Text("forecastGridData: \(weatherData.pointInfo.forecastGridDataURL.absoluteString)")
+                            Text("Fetched at: \(Int((anchorResult.fetchedAt ?? weatherData.fetchedAt).timeIntervalSince1970))")
+                            Text("Weather Summary: \(weatherData.snapshot.weatherSummary ?? "-")")
+                            Text("Hazard Summary: \(weatherData.snapshot.hazardSummary ?? "-")")
+                            Text("Slot anchor unix: \(Int(weatherData.threeSlotModel.anchorDate.timeIntervalSince1970))")
 
-                Section("Derived 3-Slot Model") {
-                    Text("Anchor Unix: \(Int(weatherData.threeSlotModel.anchorDate.timeIntervalSince1970))")
-                    Text("Slot duration minutes: \(weatherData.threeSlotModel.slotDurationMinutes)")
-                }
-
-                ForEach(weatherData.threeSlotModel.slots) { slot in
-                    Section("Slot +\(slot.offsetMinutes) min") {
-                        Text("Start Unix: \(Int(slot.startDate.timeIntervalSince1970))")
-                        Text("End Unix: \(Int(slot.endDate.timeIntervalSince1970))")
-                        Text("Temperature C: \(formattedDouble(slot.temperatureC))")
-                        Text("Temperature rule: \(slot.temperatureSelectionNote)")
-                        Text("Wind Speed km/h: \(formattedDouble(slot.windSpeedKmh))")
-                        Text("Wind Speed rule: \(slot.windSpeedSelectionNote)")
-                        Text("Wind Gust km/h: \(formattedDouble(slot.windGustKmh))")
-                        Text("Wind Gust rule: \(slot.windGustSelectionNote)")
-                        Text("Precip %: \(formattedDouble(slot.precipitationProbabilityPercent))")
-                        Text("Precip rule: \(slot.precipitationSelectionNote)")
-                        Text("Visibility m: \(formattedDouble(slot.visibilityMeters))")
-                        Text("Visibility rule: \(slot.visibilitySelectionNote)")
+                            ForEach(weatherData.threeSlotModel.slots) { slot in
+                                Text("Slot +\(slot.offsetMinutes)m tempC=\(formattedDouble(slot.temperatureC)) windKmh=\(formattedDouble(slot.windSpeedKmh)) gustKmh=\(formattedDouble(slot.windGustKmh)) pop=\(formattedDouble(slot.precipitationProbabilityPercent)) visM=\(formattedDouble(slot.visibilityMeters))")
+                                Text("Temp rule: \(slot.temperatureSelectionNote)")
+                                Text("Wind rule: \(slot.windSpeedSelectionNote)")
+                                Text("Gust rule: \(slot.windGustSelectionNote)")
+                                Text("PoP rule: \(slot.precipitationSelectionNote)")
+                                Text("Vis rule: \(slot.visibilitySelectionNote)")
+                            }
+                        } else {
+                            Text("Fetch error: \(anchorResult.errorMessage ?? "Unknown error")")
+                        }
                     }
                 }
             }
@@ -120,25 +105,6 @@ struct WeatherDebugView: View {
 
         return String(Int(timestamp.timeIntervalSince1970))
     }
-
-    @ViewBuilder
-    private func rawQuantitativeRow(title: String, value: NOAASelectedQuantitativeValue?) -> some View {
-        if let value {
-            Text("\(title): value=\(formattedDouble(value.value)) unit=\(value.unitCode ?? "-") validTime=\(value.validTime)")
-        } else {
-            Text("\(title): -")
-        }
-    }
-
-    @ViewBuilder
-    private func rawTextRow(title: String, value: NOAASelectedTextValue?) -> some View {
-        if let value {
-            Text("\(title): \(value.summary) validTime=\(value.validTime)")
-        } else {
-            Text("\(title): -")
-        }
-    }
-
     private func formattedDouble(_ value: Double?) -> String {
         guard let value else {
             return "-"
