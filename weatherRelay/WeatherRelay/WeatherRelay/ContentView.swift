@@ -37,6 +37,12 @@ struct ContentView: View {
                 Text("RX/TX characteristics discovered")
                     .foregroundStyle(.secondary)
             }
+
+            Button("Send Test Payload") {
+                bleManager.sendTestPayload()
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!bleManager.didDiscoverCharacteristics)
         }
         .padding()
     }

@@ -309,14 +309,8 @@ SWIFT_CLASS("_TtC12WeatherRelay10BLEManager")
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
-@class CBPeripheral;
-@class CBService;
-@interface BLEManager (SWIFT_EXTENSION(WeatherRelay)) <CBPeripheralDelegate>
-- (void)peripheral:(CBPeripheral * _Nonnull)peripheral didDiscoverServices:(NSError * _Nullable)error;
-- (void)peripheral:(CBPeripheral * _Nonnull)peripheral didDiscoverCharacteristicsForService:(CBService * _Nonnull)service error:(NSError * _Nullable)error;
-@end
-
 @class CBCentralManager;
+@class CBPeripheral;
 @class NSString;
 @class NSNumber;
 @interface BLEManager (SWIFT_EXTENSION(WeatherRelay)) <CBCentralManagerDelegate>
@@ -325,6 +319,16 @@ SWIFT_CLASS("_TtC12WeatherRelay10BLEManager")
 - (void)centralManager:(CBCentralManager * _Nonnull)central didConnectPeripheral:(CBPeripheral * _Nonnull)peripheral;
 - (void)centralManager:(CBCentralManager * _Nonnull)central didFailToConnectPeripheral:(CBPeripheral * _Nonnull)peripheral error:(NSError * _Nullable)error;
 - (void)centralManager:(CBCentralManager * _Nonnull)central didDisconnectPeripheral:(CBPeripheral * _Nonnull)peripheral error:(NSError * _Nullable)error;
+@end
+
+@class CBService;
+@class CBCharacteristic;
+@interface BLEManager (SWIFT_EXTENSION(WeatherRelay)) <CBPeripheralDelegate>
+- (void)peripheral:(CBPeripheral * _Nonnull)peripheral didDiscoverServices:(NSError * _Nullable)error;
+- (void)peripheral:(CBPeripheral * _Nonnull)peripheral didDiscoverCharacteristicsForService:(CBService * _Nonnull)service error:(NSError * _Nullable)error;
+- (void)peripheral:(CBPeripheral * _Nonnull)peripheral didUpdateNotificationStateForCharacteristic:(CBCharacteristic * _Nonnull)characteristic error:(NSError * _Nullable)error;
+- (void)peripheral:(CBPeripheral * _Nonnull)peripheral didUpdateValueForCharacteristic:(CBCharacteristic * _Nonnull)characteristic error:(NSError * _Nullable)error;
+- (void)peripheral:(CBPeripheral * _Nonnull)peripheral didWriteValueForCharacteristic:(CBCharacteristic * _Nonnull)characteristic error:(NSError * _Nullable)error;
 @end
 
 #endif

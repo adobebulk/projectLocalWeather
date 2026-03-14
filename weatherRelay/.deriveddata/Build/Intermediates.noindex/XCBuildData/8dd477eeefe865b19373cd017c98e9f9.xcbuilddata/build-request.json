@@ -41,6 +41,8 @@
     "overrides" : {
       "commandLine" : {
         "table" : {
+          "ARCHS" : "arm64",
+          "ONLY_ACTIVE_ARCH" : "YES",
           "SDKROOT" : "iphonesimulator26.2"
         }
       },

@@ -21,6 +21,7 @@ final class BLEManager: NSObject, ObservableObject {
     @Published var isConnected = false
     @Published var didDiscoverService = false
     @Published var didDiscoverCharacteristics = false
+    @Published var notificationsEnabled = false
     @Published var lastDiscoveredPeripheralName = "-"
     @Published var lastAdvertisedLocalName = "-"
     @Published var lastDiscoveredRSSI = "-"
@@ -52,6 +53,8 @@ final class BLEManager: NSObject, ObservableObject {
 
     private var centralManager: CBCentralManager!
     private var targetPeripheral: CBPeripheral?
+    private var rxCharacteristic: CBCharacteristic?
+    private var txCharacteristic: CBCharacteristic?
 
     override init() {
         super.init()
@@ -87,11 +90,34 @@ final class BLEManager: NSObject, ObservableObject {
         isConnected = false
         didDiscoverService = false
         didDiscoverCharacteristics = false
+        notificationsEnabled = false
         lastDiscoveredPeripheralName = "-"
         lastAdvertisedLocalName = "-"
         lastDiscoveredRSSI = "-"
         lastDiscoveredServiceUUIDs = "-"
         targetPeripheral = nil
+        rxCharacteristic = nil
+        txCharacteristic = nil
+    }
+
+    func sendTestPayload() {
+        guard let peripheral = targetPeripheral else {
+            print("BLEManager: test write skipped - no connected peripheral")
+            return
+        }
+
+        guard let rxCharacteristic else {
+            print("BLEManager: test write skipped - RX characteristic not available")
+            return
+        }
+
+        let payload = Data([0x41, 0x42, 0x43])
+        let writeType: CBCharacteristicWriteType =
+            rxCharacteristic.properties.contains(.write) ? .withResponse : .withoutResponse
+        let writeTypeDescription = writeType == .withResponse ? "withResponse" : "withoutResponse"
+
+        print("BLEManager: writing test payload hex=\(payload.hexString) using \(writeTypeDescription)")
+        peripheral.writeValue(payload, for: rxCharacteristic, type: writeType)
     }
 }
 
@@ -162,6 +188,9 @@ extension BLEManager: CBCentralManagerDelegate {
         isConnected = true
         didDiscoverService = false
         didDiscoverCharacteristics = false
+        notificationsEnabled = false
+        rxCharacteristic = nil
+        txCharacteristic = nil
 
         print("BLEManager: discovering services")
         peripheral.discoverServices([Self.serviceUUID])
@@ -229,16 +258,55 @@ extension BLEManager: CBPeripheralDelegate {
             print("BLEManager: discovered characteristic \(characteristic.uuid.uuidString) properties=\(characteristic.properties.description)")
         }
 
-        let characteristicUUIDs = Set(characteristics.map(\.uuid))
-        let hasRX = characteristicUUIDs.contains(Self.rxCharacteristicUUID)
-        let hasTX = characteristicUUIDs.contains(Self.txCharacteristicUUID)
-        didDiscoverCharacteristics = hasRX && hasTX
+        rxCharacteristic = characteristics.first(where: { $0.uuid == Self.rxCharacteristicUUID })
+        txCharacteristic = characteristics.first(where: { $0.uuid == Self.txCharacteristicUUID })
+        didDiscoverCharacteristics = rxCharacteristic != nil && txCharacteristic != nil
 
         if didDiscoverCharacteristics {
             print("BLEManager: ready - RX and TX characteristics discovered")
+
+            if let txCharacteristic {
+                print("BLEManager: enabling notifications for TX characteristic \(txCharacteristic.uuid.uuidString)")
+                peripheral.setNotifyValue(true, for: txCharacteristic)
+            }
         } else {
             print("BLEManager: characteristic discovery incomplete")
         }
+    }
+
+    func peripheral(_ peripheral: CBPeripheral,
+                    didUpdateNotificationStateFor characteristic: CBCharacteristic,
+                    error: Error?) {
+        if let error {
+            print("BLEManager: notification state update failed for \(characteristic.uuid.uuidString) error=\(error.localizedDescription)")
+            return
+        }
+
+        notificationsEnabled = characteristic.uuid == Self.txCharacteristicUUID && characteristic.isNotifying
+        print("BLEManager: notifications \(characteristic.isNotifying ? "enabled" : "disabled") for \(characteristic.uuid.uuidString)")
+    }
+
+    func peripheral(_ peripheral: CBPeripheral,
+                    didUpdateValueFor characteristic: CBCharacteristic,
+                    error: Error?) {
+        if let error {
+            print("BLEManager: notification receive failed for \(characteristic.uuid.uuidString) error=\(error.localizedDescription)")
+            return
+        }
+
+        let data = characteristic.value ?? Data()
+        print("BLEManager: received notification on \(characteristic.uuid.uuidString) hex=\(data.hexString)")
+    }
+
+    func peripheral(_ peripheral: CBPeripheral,
+                    didWriteValueFor characteristic: CBCharacteristic,
+                    error: Error?) {
+        if let error {
+            print("BLEManager: write failed for \(characteristic.uuid.uuidString) error=\(error.localizedDescription)")
+            return
+        }
+
+        print("BLEManager: write completed for \(characteristic.uuid.uuidString)")
     }
 }
 
@@ -279,5 +347,11 @@ private extension CBCharacteristicProperties {
         if contains(.indicateEncryptionRequired) { names.append("indicateEncryptionRequired") }
 
         return names.isEmpty ? "[]" : names.joined(separator: ", ")
+    }
+}
+
+private extension Data {
+    var hexString: String {
+        map { String(format: "%02X", $0) }.joined(separator: " ")
     }
 }

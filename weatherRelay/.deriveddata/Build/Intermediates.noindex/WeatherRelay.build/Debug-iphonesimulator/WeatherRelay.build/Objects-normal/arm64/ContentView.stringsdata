@@ -28,6 +28,14 @@
       },
       {
         "comment": "",
+        "key": "Send Test Payload",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 41
+        }
+      },
+      {
+        "comment": "",
         "key": "Scan state: %@",
         "location": {
           "startingColumn": 22,
