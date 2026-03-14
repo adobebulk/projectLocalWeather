@@ -19,6 +19,15 @@ struct ContentView: View {
             Text(bleManager.statusText)
                 .font(.headline)
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Scan state: \(bleManager.isScanning ? "Scanning" : "Not scanning")")
+                Text("Last peripheral name: \(bleManager.lastDiscoveredPeripheralName)")
+                Text("Last advertised name: \(bleManager.lastAdvertisedLocalName)")
+                Text("Found target: \(bleManager.didFindDevice ? "Yes" : "No")")
+            }
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             if bleManager.didDiscoverService {
                 Text("Service discovered")
                     .foregroundStyle(.secondary)

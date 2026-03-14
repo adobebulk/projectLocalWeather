@@ -15,7 +15,7 @@
         "key": "Service discovered",
         "location": {
           "startingColumn": 22,
-          "startingLine": 23
+          "startingLine": 32
         }
       },
       {
@@ -23,7 +23,39 @@
         "key": "RX/TX characteristics discovered",
         "location": {
           "startingColumn": 22,
-          "startingLine": 28
+          "startingLine": 37
+        }
+      },
+      {
+        "comment": "",
+        "key": "Scan state: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 23
+        }
+      },
+      {
+        "comment": "",
+        "key": "Last peripheral name: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 24
+        }
+      },
+      {
+        "comment": "",
+        "key": "Last advertised name: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 25
+        }
+      },
+      {
+        "comment": "",
+        "key": "Found target: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 26
         }
       }
     ]

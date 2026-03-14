@@ -21,6 +21,10 @@ final class BLEManager: NSObject, ObservableObject {
     @Published var isConnected = false
     @Published var didDiscoverService = false
     @Published var didDiscoverCharacteristics = false
+    @Published var lastDiscoveredPeripheralName = "-"
+    @Published var lastAdvertisedLocalName = "-"
+    @Published var lastDiscoveredRSSI = "-"
+    @Published var lastDiscoveredServiceUUIDs = "-"
 
     var statusText: String {
         if !bluetoothPoweredOn {
@@ -71,7 +75,11 @@ final class BLEManager: NSObject, ObservableObject {
 
         print("BLEManager: starting scan for \(Self.targetPeripheralName)")
         isScanning = true
-        centralManager.scanForPeripherals(withServices: [Self.serviceUUID], options: nil)
+        centralManager.scanForPeripherals(
+            withServices: nil,
+            options: [CBCentralManagerScanOptionAllowDuplicatesKey: false]
+        )
+        print("BLEManager: scanForPeripherals(withServices: nil, options: [CBCentralManagerScanOptionAllowDuplicatesKey: false])")
     }
 
     private func resetDiscoveryStateForNewScan() {
@@ -79,6 +87,10 @@ final class BLEManager: NSObject, ObservableObject {
         isConnected = false
         didDiscoverService = false
         didDiscoverCharacteristics = false
+        lastDiscoveredPeripheralName = "-"
+        lastAdvertisedLocalName = "-"
+        lastDiscoveredRSSI = "-"
+        lastDiscoveredServiceUUIDs = "-"
         targetPeripheral = nil
     }
 }
@@ -105,11 +117,32 @@ extension BLEManager: CBCentralManagerDelegate {
                         didDiscover peripheral: CBPeripheral,
                         advertisementData: [String: Any],
                         rssi RSSI: NSNumber) {
+        let peripheralName = peripheral.name
         let advertisedName = advertisementData[CBAdvertisementDataLocalNameKey] as? String
-        let name = peripheral.name ?? advertisedName ?? "Unnamed"
-        print("BLEManager: discovered peripheral name=\(name) id=\(peripheral.identifier) RSSI=\(RSSI)")
+        let serviceUUIDs = advertisementData[CBAdvertisementDataServiceUUIDsKey] as? [CBUUID]
+        let serviceUUIDDescription = serviceUUIDs?.map(\.uuidString).joined(separator: ", ") ?? "none"
 
-        guard name == Self.targetPeripheralName else {
+        lastDiscoveredPeripheralName = peripheralName ?? "-"
+        lastAdvertisedLocalName = advertisedName ?? "-"
+        lastDiscoveredRSSI = RSSI.stringValue
+        lastDiscoveredServiceUUIDs = serviceUUIDDescription
+
+        print(
+            """
+            BLEManager: discovered peripheral \
+            peripheral.name=\(peripheralName ?? "nil") \
+            advertisedLocalName=\(advertisedName ?? "nil") \
+            RSSI=\(RSSI) \
+            serviceUUIDs=\(serviceUUIDDescription) \
+            id=\(peripheral.identifier)
+            """
+        )
+
+        let isTargetMatch =
+            peripheralName == Self.targetPeripheralName ||
+            advertisedName == Self.targetPeripheralName
+
+        guard isTargetMatch else {
             return
         }
 
