@@ -10,8 +10,6 @@ import Foundation
 enum PacketBuilder {
     static let magic: UInt16 = 0x5743
     static let version: UInt8 = 1
-    static let packetTypePositionUpdateV1: UInt8 = 2
-    static let packetTypeAckV1: UInt8 = 3
     static let headerSize = 18
     static let positionPacketSize = 32
     static let ackPacketSize = 32
@@ -32,7 +30,7 @@ enum PacketBuilder {
 
         packet.appendLittleEndian(magic)
         packet.append(version)
-        packet.append(packetTypePositionUpdateV1)
+        packet.append(PacketType.positionUpdate.rawValue)
         packet.appendLittleEndian(UInt16(positionPacketSize))
         packet.appendLittleEndian(values.sequence)
         packet.appendLittleEndian(values.timestampUnix)

@@ -27,10 +27,7 @@ final class BLEManager: NSObject, ObservableObject {
     @Published var lastDiscoveredRSSI = "-"
     @Published var lastDiscoveredServiceUUIDs = "-"
     @Published var lastSentPacketHex = "-"
-    @Published var lastAckStatus = "-"
-    @Published var lastAckEchoedSequence = "-"
-    @Published var lastAckActiveWeatherTimestamp = "-"
-    @Published var lastAckActivePositionTimestamp = "-"
+    @Published var lastAck: AckV1?
 
     var statusText: String {
         if !bluetoothPoweredOn {
@@ -102,10 +99,7 @@ final class BLEManager: NSObject, ObservableObject {
         lastDiscoveredRSSI = "-"
         lastDiscoveredServiceUUIDs = "-"
         lastSentPacketHex = "-"
-        lastAckStatus = "-"
-        lastAckEchoedSequence = "-"
-        lastAckActiveWeatherTimestamp = "-"
-        lastAckActivePositionTimestamp = "-"
+        lastAck = nil
         targetPeripheral = nil
         rxCharacteristic = nil
         txCharacteristic = nil
@@ -335,19 +329,15 @@ extension BLEManager: CBPeripheralDelegate {
 
         do {
             let ack = try AckParser.parse(data)
-            lastAckStatus = String(ack.statusCode)
-            lastAckEchoedSequence = String(ack.echoedSequence)
-            lastAckActiveWeatherTimestamp = String(ack.activeWeatherTimestampUnix)
-            lastAckActivePositionTimestamp = String(ack.activePositionTimestampUnix)
+            lastAck = ack
 
             print(
                 """
                 BLEManager: parsed AckV1 \
-                status=\(ack.statusCode) \
-                echoedSequence=\(ack.echoedSequence) \
-                activeWeatherTimestamp=\(ack.activeWeatherTimestampUnix) \
-                activePositionTimestamp=\(ack.activePositionTimestampUnix) \
-                reserved=\(ack.reserved)
+                status=\(ack.status) \
+                echoedSequence=\(ack.sequence) \
+                activeWeatherTimestamp=\(ack.weatherTimestamp) \
+                activePositionTimestamp=\(ack.positionTimestamp)
                 """
             )
         } catch {

@@ -84,7 +84,7 @@
       },
       {
         "comment": "",
-        "key": "Last ACK status: %@",
+        "key": "ACK status: %@",
         "location": {
           "startingColumn": 22,
           "startingLine": 28

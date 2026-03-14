@@ -8,20 +8,13 @@
 import Foundation
 
 enum AckParser {
-    struct AckV1 {
-        let echoedSequence: UInt32
-        let statusCode: UInt8
-        let activeWeatherTimestampUnix: UInt32
-        let activePositionTimestampUnix: UInt32
-        let reserved: UInt8
-    }
-
     enum ParseError: LocalizedError {
         case badLength
         case badMagic
         case badVersion
         case badPacketType
         case badCRC
+        case unknownAckStatus
 
         var errorDescription: String? {
             switch self {
@@ -35,6 +28,8 @@ enum AckParser {
                 return "bad packet type"
             case .badCRC:
                 return "bad crc"
+            case .unknownAckStatus:
+                return "unknown ack status"
             }
         }
     }
@@ -52,7 +47,7 @@ enum AckParser {
             throw ParseError.badVersion
         }
 
-        guard data[3] == PacketBuilder.packetTypeAckV1 else {
+        guard data[3] == PacketType.ack.rawValue else {
             throw ParseError.badPacketType
         }
 
@@ -66,12 +61,16 @@ enum AckParser {
             throw ParseError.badCRC
         }
 
+        let rawStatus = data[PacketBuilder.headerSize + 4]
+        guard let status = AckStatus(rawValue: rawStatus) else {
+            throw ParseError.unknownAckStatus
+        }
+
         return AckV1(
-            echoedSequence: readU32(data, at: PacketBuilder.headerSize + 0),
-            statusCode: data[PacketBuilder.headerSize + 4],
-            activeWeatherTimestampUnix: readU32(data, at: PacketBuilder.headerSize + 5),
-            activePositionTimestampUnix: readU32(data, at: PacketBuilder.headerSize + 9),
-            reserved: data[PacketBuilder.headerSize + 13]
+            sequence: readU32(data, at: PacketBuilder.headerSize + 0),
+            status: status,
+            weatherTimestamp: readU32(data, at: PacketBuilder.headerSize + 5),
+            positionTimestamp: readU32(data, at: PacketBuilder.headerSize + 9)
         )
     }
 
