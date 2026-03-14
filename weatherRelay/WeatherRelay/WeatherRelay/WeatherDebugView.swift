@@ -80,6 +80,23 @@ struct WeatherDebugView: View {
                             Text("Fetched at: \(Int((anchorResult.fetchedAt ?? weatherData.fetchedAt).timeIntervalSince1970))")
                             Text("Weather Summary: \(weatherData.snapshot.weatherSummary ?? "-")")
                             Text("Hazard Summary: \(weatherData.snapshot.hazardSummary ?? "-")")
+                            Text("Forecast-grid visibility meters: \(formattedDouble(weatherData.snapshot.visibilityMeters))")
+                            Text("Forecast-grid visibility validTime: \(weatherData.forecastGridVisibilityValidTime ?? "-")")
+                            Text("Forecast-grid visibility usable: \(weatherData.forecastGridVisibilityIsUsable ? "Yes" : "No")")
+                            if let observationVisibility = weatherData.observationVisibility {
+                                Text("Observation station: \(observationVisibility.stationIdentifier) \(observationVisibility.stationName ?? "")")
+                                Text("Observation timestamp: \(observationVisibility.observationTimestamp.map { String(Int($0.timeIntervalSince1970)) } ?? "-")")
+                                Text("Observation raw visibility: \(formattedDouble(observationVisibility.rawVisibilityValue)) \(observationVisibility.rawVisibilityUnitCode ?? "-")")
+                                Text("Observation visibility meters: \(formattedDouble(observationVisibility.normalizedVisibilityMeters))")
+                                Text("Observation visibility miles: \(formattedMiles(observationVisibility.normalizedVisibilityMeters))")
+                                Text("Observation visibility usable: \(observationVisibility.isUsable ? "Yes" : "No")")
+                                Text("Observation station URL: \(observationVisibility.stationURL.absoluteString)")
+                                Text("Latest observation URL: \(observationVisibility.latestObservationURL.absoluteString)")
+                            } else {
+                                Text("Observation visibility: -")
+                            }
+                            Text("recommendedVisibilitySourceForBlock1: \(weatherData.recommendedVisibilitySourceForBlock1.rawValue)")
+                            Text("Visibility comparison note: \(weatherData.visibilityComparisonNote)")
                             Text("Slot anchor unix: \(Int(weatherData.threeSlotModel.anchorDate.timeIntervalSince1970))")
 
                             ForEach(weatherData.threeSlotModel.slots) { slot in
@@ -171,5 +188,13 @@ struct WeatherDebugView: View {
         }
 
         return String(format: "%.2f", value)
+    }
+
+    private func formattedMiles(_ meters: Double?) -> String {
+        guard let meters else {
+            return "-"
+        }
+
+        return String(format: "%.2f", meters / 1_609.344)
     }
 }

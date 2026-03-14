@@ -15,6 +15,25 @@ struct NOAAResolvedPointInfo {
     let gridX: Int
     let gridY: Int
     let forecastGridDataURL: URL
+    let observationStationsURL: URL?
+}
+
+enum Block1VisibilitySourceRecommendation: String {
+    case forecastGrid
+    case observation
+    case none
+}
+
+struct NOAAObservationVisibilityDebugData {
+    let stationIdentifier: String
+    let stationName: String?
+    let stationURL: URL
+    let latestObservationURL: URL
+    let observationTimestamp: Date?
+    let rawVisibilityValue: Double?
+    let rawVisibilityUnitCode: String?
+    let normalizedVisibilityMeters: Double?
+    let isUsable: Bool
 }
 
 struct NOAASelectedQuantitativeValue {
@@ -68,6 +87,11 @@ struct NOAAOnePointWeatherDebugData {
     let rawWeather: NOAASelectedTextValue?
     let rawHazards: NOAASelectedTextValue?
     let snapshot: OnePointWeatherSnapshot
+    let forecastGridVisibilityValidTime: String?
+    let forecastGridVisibilityIsUsable: Bool
+    let observationVisibility: NOAAObservationVisibilityDebugData?
+    let recommendedVisibilitySourceForBlock1: Block1VisibilitySourceRecommendation
+    let visibilityComparisonNote: String
     let threeSlotModel: OnePointThreeSlotWeatherModel
 }
 
@@ -101,6 +125,8 @@ final class NOAAClient {
     private let session: URLSession
     private let userAgent: String
     private let acceptHeader = "application/geo+json"
+    private static let observationFreshnessMaximumAgeSeconds: TimeInterval = 3 * 3600
+    private static let maximumSaneVisibilityMeters: Double = 200_000
 
     init(
         session: URLSession = .shared,
@@ -255,6 +281,12 @@ final class NOAAClient {
             weatherSummary: rawWeather?.summary,
             hazardSummary: rawHazards?.summary
         )
+        let observationVisibility = await fetchObservationVisibility(pointInfo: pointInfo, logPrefix: logPrefix)
+        let forecastGridVisibilityUsable = Self.isSaneVisibility(snapshot.visibilityMeters)
+        let visibilityRecommendation = Self.recommendVisibilitySourceForBlock1(
+            forecastGridVisibilityMeters: snapshot.visibilityMeters,
+            observationVisibility: observationVisibility
+        )
         let threeSlotModel = Self.deriveThreeSlotModel(properties: forecastProperties, fieldAnchorDate: fieldAnchorDate)
 
         print(
@@ -267,6 +299,19 @@ final class NOAAClient {
             visibilityMeters=\(snapshot.visibilityMeters.map(Self.formatDouble) ?? "nil") \
             weatherSummary=\(snapshot.weatherSummary ?? "nil") \
             hazardSummary=\(snapshot.hazardSummary ?? "nil")
+            """
+        )
+        print(
+            """
+            \(logPrefix): visibility comparison \
+            forecastGridMeters=\(snapshot.visibilityMeters.map(Self.formatDouble) ?? "nil") \
+            forecastGridValidTime=\(rawVisibility?.validTime ?? "nil") \
+            forecastGridUsable=\(forecastGridVisibilityUsable) \
+            observationMeters=\(observationVisibility?.normalizedVisibilityMeters.map(Self.formatDouble) ?? "nil") \
+            observationTimestamp=\(observationVisibility?.observationTimestamp.map { String(Int($0.timeIntervalSince1970)) } ?? "nil") \
+            observationUsable=\(observationVisibility?.isUsable ?? false) \
+            recommendedVisibilitySourceForBlock1=\(visibilityRecommendation.recommendation.rawValue) \
+            note=\(visibilityRecommendation.note)
             """
         )
         Self.logThreeSlotModel(threeSlotModel, logPrefix: logPrefix)
@@ -282,6 +327,11 @@ final class NOAAClient {
             rawWeather: rawWeather,
             rawHazards: rawHazards,
             snapshot: snapshot,
+            forecastGridVisibilityValidTime: rawVisibility?.validTime,
+            forecastGridVisibilityIsUsable: forecastGridVisibilityUsable,
+            observationVisibility: observationVisibility,
+            recommendedVisibilitySourceForBlock1: visibilityRecommendation.recommendation,
+            visibilityComparisonNote: visibilityRecommendation.note,
             threeSlotModel: threeSlotModel
         )
     }
@@ -343,6 +393,12 @@ final class NOAAClient {
         }
 
         let cwa = properties["cwa"] as? String ?? "-"
+        let observationStationsURL: URL?
+        if let observationStationsString = properties["observationStations"] as? String {
+            observationStationsURL = URL(string: observationStationsString)
+        } else {
+            observationStationsURL = nil
+        }
 
         return NOAAResolvedPointInfo(
             requestLatitude: latitude,
@@ -351,8 +407,150 @@ final class NOAAClient {
             gridId: gridId,
             gridX: gridX,
             gridY: gridY,
-            forecastGridDataURL: forecastGridDataURL
+            forecastGridDataURL: forecastGridDataURL,
+            observationStationsURL: observationStationsURL
         )
+    }
+
+    private func fetchObservationVisibility(
+        pointInfo: NOAAResolvedPointInfo,
+        logPrefix: String
+    ) async -> NOAAObservationVisibilityDebugData? {
+        guard let observationStationsURL = pointInfo.observationStationsURL else {
+            print("\(logPrefix): observation visibility unavailable - points response missing properties.observationStations")
+            return nil
+        }
+
+        do {
+            print("\(logPrefix): fetching observation stations url=\(observationStationsURL.absoluteString)")
+            let stationsJSON = try await fetchJSONObject(from: observationStationsURL)
+            guard let features = stationsJSON["features"] as? [[String: Any]], !features.isEmpty else {
+                print("\(logPrefix): observation visibility unavailable - no stations in features")
+                return nil
+            }
+
+            let stationFeature = features[0]
+            let stationProperties = stationFeature["properties"] as? [String: Any]
+            let stationIdentifier =
+                stationProperties?["stationIdentifier"] as? String ??
+                stationProperties?["id"] as? String ??
+                "unknown"
+            let stationName = stationProperties?["name"] as? String
+            let stationURLString =
+                stationProperties?["@id"] as? String ??
+                stationFeature["id"] as? String ??
+                "https://api.weather.gov/stations/\(stationIdentifier)"
+            guard let stationURL = URL(string: stationURLString) else {
+                print("\(logPrefix): observation visibility unavailable - invalid station URL string=\(stationURLString)")
+                return nil
+            }
+
+            let latestObservationURL = stationURL.appending(path: "observations/latest")
+            print(
+                """
+                \(logPrefix): nearest observation station selected \
+                stationIdentifier=\(stationIdentifier) \
+                stationName=\(stationName ?? "nil") \
+                stationURL=\(stationURL.absoluteString) \
+                latestObservationURL=\(latestObservationURL.absoluteString)
+                """
+            )
+
+            let latestObservationJSON = try await fetchJSONObject(from: latestObservationURL)
+            guard let latestProperties = latestObservationJSON["properties"] as? [String: Any] else {
+                print("\(logPrefix): observation visibility unavailable - latest observation missing properties")
+                return nil
+            }
+
+            let timestampString = latestProperties["timestamp"] as? String
+            let observationTimestamp = timestampString.flatMap {
+                Self.fractionalISO8601Formatter.date(from: $0) ?? Self.plainISO8601Formatter.date(from: $0)
+            }
+            let visibilityObject = latestProperties["visibility"] as? [String: Any]
+            let rawVisibilityValue = Self.doubleValue(from: visibilityObject?["value"])
+            let rawVisibilityUnitCode = visibilityObject?["unitCode"] as? String
+            let normalizedVisibilityMeters = Self.convertLengthToMeters(
+                NOAASelectedQuantitativeValue(
+                    fieldName: "observationVisibility",
+                    validTime: timestampString ?? "unknown",
+                    unitCode: rawVisibilityUnitCode,
+                    value: rawVisibilityValue
+                )
+            )
+
+            let isRecent: Bool
+            if let observationTimestamp {
+                let ageSeconds = Date().timeIntervalSince(observationTimestamp)
+                isRecent = ageSeconds >= 0 && ageSeconds <= Self.observationFreshnessMaximumAgeSeconds
+            } else {
+                isRecent = false
+            }
+            let isUsable = Self.isSaneVisibility(normalizedVisibilityMeters) && isRecent
+
+            print(
+                """
+                \(logPrefix): observation visibility raw \
+                stationIdentifier=\(stationIdentifier) \
+                observationTimestamp=\(timestampString ?? "nil") \
+                rawVisibilityValue=\(rawVisibilityValue.map(Self.formatDouble) ?? "nil") \
+                rawVisibilityUnitCode=\(rawVisibilityUnitCode ?? "nil")
+                """
+            )
+            print(
+                """
+                \(logPrefix): observation visibility normalized \
+                stationIdentifier=\(stationIdentifier) \
+                normalizedVisibilityMeters=\(normalizedVisibilityMeters.map(Self.formatDouble) ?? "nil") \
+                isRecent=\(isRecent) \
+                isUsable=\(isUsable)
+                """
+            )
+
+            return NOAAObservationVisibilityDebugData(
+                stationIdentifier: stationIdentifier,
+                stationName: stationName,
+                stationURL: stationURL,
+                latestObservationURL: latestObservationURL,
+                observationTimestamp: observationTimestamp,
+                rawVisibilityValue: rawVisibilityValue,
+                rawVisibilityUnitCode: rawVisibilityUnitCode,
+                normalizedVisibilityMeters: normalizedVisibilityMeters,
+                isUsable: isUsable
+            )
+        } catch {
+            print("\(logPrefix): observation visibility fetch failed error=\(error.localizedDescription)")
+            return nil
+        }
+    }
+
+    private static func recommendVisibilitySourceForBlock1(
+        forecastGridVisibilityMeters: Double?,
+        observationVisibility: NOAAObservationVisibilityDebugData?
+    ) -> (recommendation: Block1VisibilitySourceRecommendation, note: String) {
+        let forecastUsable = isSaneVisibility(forecastGridVisibilityMeters)
+        let observationUsable = observationVisibility?.isUsable ?? false
+
+        if forecastUsable {
+            return (.forecastGrid, "forecast-grid visibility present and sane")
+        }
+
+        if observationUsable {
+            return (.observation, "forecast-grid visibility missing/unsuitable and recent observation visibility present")
+        }
+
+        if forecastGridVisibilityMeters == nil && observationVisibility == nil {
+            return (.none, "both forecast-grid and observation visibility sources unavailable")
+        }
+
+        return (.none, "no usable visibility source met Block 1 recommendation criteria")
+    }
+
+    private static func isSaneVisibility(_ visibilityMeters: Double?) -> Bool {
+        guard let visibilityMeters else {
+            return false
+        }
+
+        return visibilityMeters > 0 && visibilityMeters <= maximumSaneVisibilityMeters
     }
 
     private func parseForecastProperties(from json: [String: Any]) throws -> [String: Any] {
