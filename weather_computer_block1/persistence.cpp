@@ -17,7 +17,7 @@ constexpr char kPositionSlot1Key[] = "ps1";
 constexpr uint32_t kRecordMagic = 0x57435244UL;
 constexpr uint16_t kRecordVersion = 1;
 
-struct RecordHeader {
+struct __attribute__((packed)) RecordHeader {
   uint32_t magic;
   uint16_t record_version;
   uint16_t payload_size;
@@ -26,7 +26,7 @@ struct RecordHeader {
 };
 
 template <typename Payload>
-struct PersistRecord {
+struct __attribute__((packed)) PersistRecord {
   RecordHeader header;
   Payload payload;
 };
