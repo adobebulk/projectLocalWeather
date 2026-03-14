@@ -10,9 +10,22 @@
 		4A4A4DE92F64DBF8002F133B /* WeatherRelay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WeatherRelay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4AC3456E2F652A4A000D7384 /* Exceptions for "WeatherRelay" folder in "WeatherRelay" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4A4A4DE82F64DBF8002F133B /* WeatherRelay */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4A4A4DEB2F64DBF8002F133B /* WeatherRelay */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4AC3456E2F652A4A000D7384 /* Exceptions for "WeatherRelay" folder in "WeatherRelay" target */,
+			);
 			path = WeatherRelay;
 			sourceTree = "<group>";
 		};
@@ -254,12 +267,13 @@
 				DEVELOPMENT_TEAM = 7HYK6KB95F;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WeatherRelay/Info.plist;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Connect to WeatherComputer device";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Allow WeatherRelay to refresh your position for WeatherComputer while the app is in the background";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Use your location to send position updates to WeatherComputer";
-				INFOPLIST_KEY_UIBackgroundModes = "location bluetooth-central";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "location bluetooth-central";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -290,12 +304,13 @@
 				DEVELOPMENT_TEAM = 7HYK6KB95F;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = WeatherRelay/Info.plist;
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Connect to WeatherComputer device";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Allow WeatherRelay to refresh your position for WeatherComputer while the app is in the background";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Use your location to send position updates to WeatherComputer";
-				INFOPLIST_KEY_UIBackgroundModes = "location bluetooth-central";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UIBackgroundModes = "location bluetooth-central";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
