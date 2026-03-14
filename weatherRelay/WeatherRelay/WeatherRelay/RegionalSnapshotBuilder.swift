@@ -50,6 +50,8 @@ struct RegionalSnapshotSlotPacketDebug: Identifiable {
     let precipitationKind: PrecipitationKind
     let precipitationIntensity: PrecipitationIntensity
     let reserved0: UInt8
+    let visibilitySource: String
+    let visibilitySourceMeters: Double?
     let visibilityM: UInt16
     let hazardFlags: HazardFlags
     let quantizationNotes: [String]
@@ -69,6 +71,12 @@ enum RegionalSnapshotBuilder {
     private static let gridCols: UInt8 = 3
     private static let reserved0: UInt8 = 0
     private static let forecastHorizonMin: UInt16 = 120
+
+    private enum PacketVisibilitySource: String {
+        case forecastGrid
+        case observation
+        case none
+    }
 
     static func makeRegionalSnapshotV1DebugData(
         field: ThreeByThreeWeatherFieldDebugData,
@@ -200,7 +208,7 @@ enum RegionalSnapshotBuilder {
         let slots = anchorResult.weatherData?.threeSlotModel.slots ?? []
         let packetSlots = [0, 60, 120].map { offsetMinutes -> RegionalSnapshotSlotPacketDebug in
             let slot = slots.first(where: { $0.offsetMinutes == offsetMinutes })
-            let debugSlot = quantizeSlot(anchorLabel: anchorResult.anchor.label, offsetMinutes: offsetMinutes, slot: slot)
+            let debugSlot = quantizeSlot(anchorResult: anchorResult, offsetMinutes: offsetMinutes, slot: slot)
 
             packet.appendLittleEndian(debugSlot.slotOffsetMin)
             packet.appendLittleEndian(debugSlot.temperatureDeciC)
@@ -224,10 +232,11 @@ enum RegionalSnapshotBuilder {
     }
 
     private static func quantizeSlot(
-        anchorLabel: String,
+        anchorResult: WeatherFieldAnchorResult,
         offsetMinutes: Int,
         slot: OnePointWeatherSlot?
     ) -> RegionalSnapshotSlotPacketDebug {
+        let anchorLabel = anchorResult.anchor.label
         var notes: [String] = []
 
         if let slot {
@@ -291,8 +300,14 @@ enum RegionalSnapshotBuilder {
         let precipitationIntensity = precipitationIntensityResult.intensity
         let reserved0: UInt8 = 0
 
+        let visibilitySelection = selectVisibilityForPacket(
+            anchorResult: anchorResult,
+            slot: slot,
+            offsetMinutes: offsetMinutes,
+            notes: &notes
+        )
         let visibilityM = quantizeVisibilityMeters(
-            slot?.visibilityMeters,
+            visibilitySelection.visibilityMeters,
             anchorLabel: anchorLabel,
             offsetMinutes: offsetMinutes,
             notes: &notes
@@ -319,6 +334,8 @@ enum RegionalSnapshotBuilder {
             precipitationProbabilityPercent=\(precipitationProbabilityPercent) \
             precipitationKind=\(precipitationKind.description) \
             precipitationIntensity=\(precipitationIntensity.description) \
+            visibilitySource=\(visibilitySelection.source.rawValue) \
+            visibilitySourceMeters=\(visibilitySelection.visibilityMeters.map { String(format: "%.2f", $0) } ?? "nil") \
             visibilityM=\(visibilityM) \
             hazardFlags=\(hazardFlags.description)
             """
@@ -334,10 +351,78 @@ enum RegionalSnapshotBuilder {
             precipitationKind: precipitationKind,
             precipitationIntensity: precipitationIntensity,
             reserved0: reserved0,
+            visibilitySource: visibilitySelection.source.rawValue,
+            visibilitySourceMeters: visibilitySelection.visibilityMeters,
             visibilityM: visibilityM,
             hazardFlags: hazardFlags,
             quantizationNotes: notes
         )
+    }
+
+    private static func selectVisibilityForPacket(
+        anchorResult: WeatherFieldAnchorResult,
+        slot: OnePointWeatherSlot?,
+        offsetMinutes: Int,
+        notes: inout [String]
+    ) -> (source: PacketVisibilitySource, visibilityMeters: Double?) {
+        let anchorLabel = anchorResult.anchor.label
+        let forecastGridVisibility = slot?.visibilityMeters
+        let forecastGridUsable = isSaneVisibility(forecastGridVisibility)
+        let observationVisibility = anchorResult.weatherData?.observationVisibility
+        let observationMeters = observationVisibility?.normalizedVisibilityMeters
+        let observationUsable = observationVisibility?.isUsable ?? false
+        let observationAgeMinutes = observationVisibility?.observationAgeMinutes
+
+        let source: PacketVisibilitySource
+        let selectedMeters: Double?
+
+        if anchorLabel == "r1c1", observationUsable {
+            source = .observation
+            selectedMeters = observationMeters
+        } else if forecastGridUsable {
+            source = .forecastGrid
+            selectedMeters = forecastGridVisibility
+        } else {
+            source = .none
+            selectedMeters = nil
+        }
+
+        notes.append(
+            """
+            visibility source chosen=\(source.rawValue) \
+            forecastGridMeters=\(forecastGridVisibility.map { String(format: "%.2f", $0) } ?? "nil") \
+            forecastGridUsable=\(forecastGridUsable) \
+            observationMeters=\(observationMeters.map { String(format: "%.2f", $0) } ?? "nil") \
+            observationUsable=\(observationUsable) \
+            observationAgeMinutes=\(observationAgeMinutes.map(String.init) ?? "nil") \
+            packetVisibilityPreSerializationMeters=\(selectedMeters.map { String(format: "%.2f", $0) } ?? "nil")
+            """
+        )
+
+        print(
+            """
+            RegionalSnapshotBuilder: visibility source chosen \
+            anchor=\(anchorLabel) \
+            offsetMinutes=\(offsetMinutes) \
+            source=\(source.rawValue) \
+            forecastGridMeters=\(forecastGridVisibility.map { String(format: "%.2f", $0) } ?? "nil") \
+            forecastGridUsable=\(forecastGridUsable) \
+            observationMeters=\(observationMeters.map { String(format: "%.2f", $0) } ?? "nil") \
+            observationUsable=\(observationUsable) \
+            observationAgeMinutes=\(observationAgeMinutes.map(String.init) ?? "nil") \
+            packetVisibilityPreSerializationMeters=\(selectedMeters.map { String(format: "%.2f", $0) } ?? "nil")
+            """
+        )
+
+        return (source, selectedMeters)
+    }
+
+    private static func isSaneVisibility(_ visibilityMeters: Double?) -> Bool {
+        guard let visibilityMeters else {
+            return false
+        }
+
+        return visibilityMeters > 0 && visibilityMeters <= 200_000
     }
 
     private static func orderedAnchorResults(from field: ThreeByThreeWeatherFieldDebugData) -> [WeatherFieldAnchorResult] {

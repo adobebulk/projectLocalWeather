@@ -32,7 +32,10 @@ struct NOAAObservationVisibilityDebugData {
     let observationTimestamp: Date?
     let rawVisibilityValue: Double?
     let rawVisibilityUnitCode: String?
+    let rawSourcePath: String
+    let rawSourceObjectDescription: String
     let normalizedVisibilityMeters: Double?
+    let observationAgeMinutes: Int?
     let isUsable: Bool
 }
 
@@ -309,6 +312,7 @@ final class NOAAClient {
             forecastGridUsable=\(forecastGridVisibilityUsable) \
             observationMeters=\(observationVisibility?.normalizedVisibilityMeters.map(Self.formatDouble) ?? "nil") \
             observationTimestamp=\(observationVisibility?.observationTimestamp.map { String(Int($0.timeIntervalSince1970)) } ?? "nil") \
+            observationAgeMinutes=\(observationVisibility?.observationAgeMinutes.map(String.init) ?? "nil") \
             observationUsable=\(observationVisibility?.isUsable ?? false) \
             recommendedVisibilitySourceForBlock1=\(visibilityRecommendation.recommendation.rawValue) \
             note=\(visibilityRecommendation.note)
@@ -466,9 +470,9 @@ final class NOAAClient {
             let observationTimestamp = timestampString.flatMap {
                 Self.fractionalISO8601Formatter.date(from: $0) ?? Self.plainISO8601Formatter.date(from: $0)
             }
-            let visibilityObject = latestProperties["visibility"] as? [String: Any]
-            let rawVisibilityValue = Self.doubleValue(from: visibilityObject?["value"])
-            let rawVisibilityUnitCode = visibilityObject?["unitCode"] as? String
+            let visibilityExtraction = Self.extractObservationVisibility(from: latestProperties, logPrefix: logPrefix)
+            let rawVisibilityValue = visibilityExtraction.rawValue
+            let rawVisibilityUnitCode = visibilityExtraction.unitCode
             let normalizedVisibilityMeters = Self.convertLengthToMeters(
                 NOAASelectedQuantitativeValue(
                     fieldName: "observationVisibility",
@@ -479,10 +483,13 @@ final class NOAAClient {
             )
 
             let isRecent: Bool
+            let observationAgeMinutes: Int?
             if let observationTimestamp {
                 let ageSeconds = Date().timeIntervalSince(observationTimestamp)
+                observationAgeMinutes = Int((ageSeconds / 60.0).rounded(.down))
                 isRecent = ageSeconds >= 0 && ageSeconds <= Self.observationFreshnessMaximumAgeSeconds
             } else {
+                observationAgeMinutes = nil
                 isRecent = false
             }
             let isUsable = Self.isSaneVisibility(normalizedVisibilityMeters) && isRecent
@@ -493,7 +500,9 @@ final class NOAAClient {
                 stationIdentifier=\(stationIdentifier) \
                 observationTimestamp=\(timestampString ?? "nil") \
                 rawVisibilityValue=\(rawVisibilityValue.map(Self.formatDouble) ?? "nil") \
-                rawVisibilityUnitCode=\(rawVisibilityUnitCode ?? "nil")
+                rawVisibilityUnitCode=\(rawVisibilityUnitCode ?? "nil") \
+                rawSourcePath=\(visibilityExtraction.sourcePath) \
+                rawSourceObject=\(visibilityExtraction.sourceObjectDescription)
                 """
             )
             print(
@@ -501,6 +510,7 @@ final class NOAAClient {
                 \(logPrefix): observation visibility normalized \
                 stationIdentifier=\(stationIdentifier) \
                 normalizedVisibilityMeters=\(normalizedVisibilityMeters.map(Self.formatDouble) ?? "nil") \
+                observationAgeMinutes=\(observationAgeMinutes.map(String.init) ?? "nil") \
                 isRecent=\(isRecent) \
                 isUsable=\(isUsable)
                 """
@@ -514,7 +524,10 @@ final class NOAAClient {
                 observationTimestamp: observationTimestamp,
                 rawVisibilityValue: rawVisibilityValue,
                 rawVisibilityUnitCode: rawVisibilityUnitCode,
+                rawSourcePath: visibilityExtraction.sourcePath,
+                rawSourceObjectDescription: visibilityExtraction.sourceObjectDescription,
                 normalizedVisibilityMeters: normalizedVisibilityMeters,
+                observationAgeMinutes: observationAgeMinutes,
                 isUsable: isUsable
             )
         } catch {
@@ -551,6 +564,56 @@ final class NOAAClient {
         }
 
         return visibilityMeters > 0 && visibilityMeters <= maximumSaneVisibilityMeters
+    }
+
+    private static func extractObservationVisibility(
+        from latestProperties: [String: Any],
+        logPrefix: String
+    ) -> (rawValue: Double?, unitCode: String?, sourcePath: String, sourceObjectDescription: String) {
+        if let topLevelVisibility = latestProperties["visibility"] as? [String: Any] {
+            let rawValue = doubleValue(from: topLevelVisibility["value"])
+            let unitCode = topLevelVisibility["unitCode"] as? String
+            print(
+                """
+                \(logPrefix): observation visibility candidate \
+                sourcePath=properties.visibility \
+                object=\(debugJSONString(topLevelVisibility)) \
+                parsedRawValue=\(rawValue.map(formatDouble) ?? "nil") \
+                parsedUnitCode=\(unitCode ?? "nil")
+                """
+            )
+            if rawValue != nil {
+                return (rawValue, unitCode, "properties.visibility.value", debugJSONString(topLevelVisibility))
+            }
+        }
+
+        if
+            let presentWeather = latestProperties["presentWeather"] as? [String: Any],
+            let values = presentWeather["values"] as? [[String: Any]]
+        {
+            for (index, entry) in values.enumerated() {
+                if let visibilityObject = entry["visibility"] as? [String: Any] {
+                    let rawValue = doubleValue(from: visibilityObject["value"])
+                    let unitCode = visibilityObject["unitCode"] as? String
+                    let sourcePath = "properties.presentWeather.values[\(index)].visibility.value"
+                    print(
+                        """
+                        \(logPrefix): observation visibility candidate \
+                        sourcePath=\(sourcePath) \
+                        object=\(debugJSONString(visibilityObject)) \
+                        parsedRawValue=\(rawValue.map(formatDouble) ?? "nil") \
+                        parsedUnitCode=\(unitCode ?? "nil")
+                        """
+                    )
+                    if rawValue != nil {
+                        return (rawValue, unitCode, sourcePath, debugJSONString(visibilityObject))
+                    }
+                }
+            }
+        }
+
+        print("\(logPrefix): observation visibility candidate not found in supported paths")
+        return (nil, nil, "none", "nil")
     }
 
     private func parseForecastProperties(from json: [String: Any]) throws -> [String: Any] {

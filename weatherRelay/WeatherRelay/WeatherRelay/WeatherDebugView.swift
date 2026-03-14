@@ -87,8 +87,11 @@ struct WeatherDebugView: View {
                                 Text("Observation station: \(observationVisibility.stationIdentifier) \(observationVisibility.stationName ?? "")")
                                 Text("Observation timestamp: \(observationVisibility.observationTimestamp.map { String(Int($0.timeIntervalSince1970)) } ?? "-")")
                                 Text("Observation raw visibility: \(formattedDouble(observationVisibility.rawVisibilityValue)) \(observationVisibility.rawVisibilityUnitCode ?? "-")")
+                                Text("Observation raw source path: \(observationVisibility.rawSourcePath)")
+                                Text("Observation raw source object: \(observationVisibility.rawSourceObjectDescription)")
                                 Text("Observation visibility meters: \(formattedDouble(observationVisibility.normalizedVisibilityMeters))")
                                 Text("Observation visibility miles: \(formattedMiles(observationVisibility.normalizedVisibilityMeters))")
+                                Text("Observation age minutes: \(observationVisibility.observationAgeMinutes.map(String.init) ?? "-")")
                                 Text("Observation visibility usable: \(observationVisibility.isUsable ? "Yes" : "No")")
                                 Text("Observation station URL: \(observationVisibility.stationURL.absoluteString)")
                                 Text("Latest observation URL: \(observationVisibility.latestObservationURL.absoluteString)")
@@ -145,7 +148,7 @@ struct WeatherDebugView: View {
                         Text("Coordinate: \(anchor.anchorCoordinateText)")
 
                         ForEach(anchor.slots) { slot in
-                            Text("Slot +\(slot.offsetMinutes)m slotOffsetMin=\(slot.slotOffsetMin) airTempCTenths=\(slot.temperatureDeciC) windSpeedMpsTenths=\(slot.windSpeedMpsTenths) windGustMpsTenths=\(slot.windGustMpsTenths) precipProbPct=\(slot.precipitationProbabilityPercent) precipKind=\(slot.precipitationKind.description) precipIntensity=\(slot.precipitationIntensity.description) reserved0=\(slot.reserved0) visibilityM=\(slot.visibilityM) hazardFlags=\(slot.hazardFlags.description)")
+                            Text("Slot +\(slot.offsetMinutes)m slotOffsetMin=\(slot.slotOffsetMin) airTempCTenths=\(slot.temperatureDeciC) windSpeedMpsTenths=\(slot.windSpeedMpsTenths) windGustMpsTenths=\(slot.windGustMpsTenths) precipProbPct=\(slot.precipitationProbabilityPercent) precipKind=\(slot.precipitationKind.description) precipIntensity=\(slot.precipitationIntensity.description) reserved0=\(slot.reserved0) visibilitySource=\(slot.visibilitySource) visibilitySourceMeters=\(formattedDouble(slot.visibilitySourceMeters)) visibilityM=\(slot.visibilityM) hazardFlags=\(slot.hazardFlags.description)")
                             ForEach(slot.quantizationNotes, id: \.self) { note in
                                 Text("Note: \(note)")
                             }
