@@ -31,7 +31,11 @@ struct WeatherFieldMapView: View {
             return []
         }
 
-        let corners = Block1FieldGeometry.fieldBoundaryCoordinates(center: fieldData.center)
+        let corners = Block1FieldGeometry.fieldBoundaryCoordinates(
+            center: fieldData.center,
+            fieldWidthMiles: fieldData.fieldWidthMiles,
+            fieldHeightMiles: fieldData.fieldHeightMiles
+        )
         guard let first = corners.first else {
             return []
         }
@@ -46,6 +50,7 @@ struct WeatherFieldMapView: View {
                     """
                     Center \(String(format: "%.5f", fieldData.center.latitude)), \
                     \(String(format: "%.5f", fieldData.center.longitude)) \
+                    | width \(Int(fieldData.fieldWidthMiles.rounded())) mi \
                     | slot +\(selectedSlotOffsetMinutes)m
                     """
                 )
@@ -130,6 +135,12 @@ struct WeatherFieldMapView: View {
         .onAppear {
             let hasField = fieldData != nil
             AppLogger.shared.log(category: "MAP", message: "weather field map appeared hasField=\(hasField) slot=\(selectedSlotOffsetMinutes)")
+            if let fieldData {
+                AppLogger.shared.log(
+                    category: "MAP",
+                    message: "map boundary updated widthMi=\(Int(fieldData.fieldWidthMiles.rounded())) heightMi=\(Int(fieldData.fieldHeightMiles.rounded()))"
+                )
+            }
             rebuildAnchorNodes(reason: "appear")
             updateCameraPosition(reason: "appear")
         }
@@ -139,6 +150,12 @@ struct WeatherFieldMapView: View {
         }
         .onChange(of: viewModel.latestPacketRevision) { _, newRevision in
             AppLogger.shared.log(category: "MAP", message: "map weather field changed packetRevision=\(newRevision) hasField=\(fieldData != nil)")
+            if let fieldData {
+                AppLogger.shared.log(
+                    category: "MAP",
+                    message: "map boundary updated widthMi=\(Int(fieldData.fieldWidthMiles.rounded())) heightMi=\(Int(fieldData.fieldHeightMiles.rounded()))"
+                )
+            }
             rebuildAnchorNodes(reason: "field-revision")
             updateCameraPosition(reason: "field-revision")
         }

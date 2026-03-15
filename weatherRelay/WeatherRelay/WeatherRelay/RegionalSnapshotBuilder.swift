@@ -65,8 +65,6 @@ enum RegionalSnapshotBuilder {
     private static let anchorCount = 9
     private static let slotCount = 3
     private static let bytesPerAnchorSlot = 16
-    private static let fieldWidthMi: UInt16 = 240
-    private static let fieldHeightMi: UInt16 = 240
     private static let gridRows: UInt8 = 3
     private static let gridCols: UInt8 = 3
     private static let reserved0: UInt8 = 0
@@ -89,6 +87,16 @@ enum RegionalSnapshotBuilder {
         let sourceAgeMin = quantizeSourceAgeMinutes(referenceDate: fieldGenerationDate, anchors: orderedAnchors)
         let centerLatE5 = Int32((field.center.latitude * 100_000).rounded())
         let centerLonE5 = Int32((field.center.longitude * 100_000).rounded())
+        let fieldWidthMi = quantizeFieldMiles(
+            field.fieldWidthMiles,
+            fieldName: "field_width_mi",
+            defaultValue: Block1FieldGeometry.defaultFieldWidthMiles
+        )
+        let fieldHeightMi = quantizeFieldMiles(
+            field.fieldHeightMiles,
+            fieldName: "field_height_mi",
+            defaultValue: Block1FieldGeometry.defaultFieldHeightMiles
+        )
         let expectedPacketSize = PacketBuilder.headerSize + payloadHeaderSize + (anchorCount * slotCount * bytesPerAnchorSlot)
         let layoutLogLines = packetLayoutLogLines()
 
@@ -154,7 +162,11 @@ enum RegionalSnapshotBuilder {
         )
         AppLogger.shared.log(
             category: "PACKET",
-            message: "regional snapshot built sequence=\(sequence) bytes=\(packet.count) sourceAgeMin=\(sourceAgeMin)"
+            message: "regional snapshot built sequence=\(sequence) bytes=\(packet.count) widthMi=\(fieldWidthMi) heightMi=\(fieldHeightMi) sourceAgeMin=\(sourceAgeMin)"
+        )
+        AppLogger.shared.log(
+            category: "PACKET",
+            message: "packet metadata widthMi=\(fieldWidthMi) heightMi=\(fieldHeightMi)"
         )
 
         return RegionalSnapshotPacketDebugData(
@@ -203,6 +215,15 @@ enum RegionalSnapshotBuilder {
             "RegionalSnapshotBuilder: cell layout hazard_flags offsets=14..15 size=2",
             "RegionalSnapshotBuilder: layout totals header=18 metadata=20 cells=432 total=470"
         ]
+    }
+
+    private static func quantizeFieldMiles(_ value: Double, fieldName: String, defaultValue: Int) -> UInt16 {
+        if !value.isFinite || value <= 0 {
+            print("RegionalSnapshotBuilder: \(fieldName) invalid value=\(value) defaulting to \(defaultValue)")
+            return UInt16(defaultValue)
+        }
+
+        return UInt16(min(max(Int(value.rounded()), 1), Int(UInt16.max)))
     }
 
     private static func makeAnchorPacketDebug(

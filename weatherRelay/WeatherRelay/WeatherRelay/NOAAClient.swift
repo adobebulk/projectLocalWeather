@@ -148,9 +148,21 @@ final class NOAAClient {
         )
     }
 
-    func fetchThreeByThreeField(centerLatitude: Double, centerLongitude: Double) async -> ThreeByThreeWeatherFieldDebugData {
+    func fetchThreeByThreeField(
+        centerLatitude: Double,
+        centerLongitude: Double,
+        fieldWidthMiles: Int
+    ) async -> ThreeByThreeWeatherFieldDebugData {
         let center = WeatherFieldCenter(latitude: centerLatitude, longitude: centerLongitude)
-        let anchors = Block1FieldGeometry.makeAnchorCoordinates(center: center)
+        let normalizedFieldWidthMiles = max(10, fieldWidthMiles)
+        let normalizedFieldHeightMiles = normalizedFieldWidthMiles
+        let anchorSpacingMiles = Double(normalizedFieldWidthMiles) / 2.0
+        let anchorSpacingMeters = anchorSpacingMiles * 1_609.344
+        let anchors = Block1FieldGeometry.makeAnchorCoordinates(
+            center: center,
+            fieldWidthMiles: Double(normalizedFieldWidthMiles),
+            fieldHeightMiles: Double(normalizedFieldHeightMiles)
+        )
         let fieldAnchorDate = Date()
 
         print(
@@ -158,10 +170,16 @@ final class NOAAClient {
             NOAAClient: starting 3x3 field fetch \
             centerLat=\(centerLatitude) \
             centerLon=\(centerLongitude) \
+            fieldWidthMi=\(normalizedFieldWidthMiles) \
+            fieldHeightMi=\(normalizedFieldHeightMiles) \
             fieldAnchorUnix=\(Int(fieldAnchorDate.timeIntervalSince1970)) \
-            anchorSpacingMiles=\(Int(Block1FieldGeometry.anchorSpacingMiles)) \
-            anchorSpacingMeters=\(Int(Block1FieldGeometry.anchorSpacingMeters))
+            anchorSpacingMiles=\(Int(anchorSpacingMiles.rounded())) \
+            anchorSpacingMeters=\(Int(anchorSpacingMeters.rounded()))
             """
+        )
+        AppLogger.shared.log(
+            category: "NOAA",
+            message: "rebuilding geometry with widthMi=\(normalizedFieldWidthMiles) heightMi=\(normalizedFieldHeightMiles) anchorSpacingMi=\(Int(anchorSpacingMiles.rounded()))"
         )
 
         let anchorResults = await withTaskGroup(of: WeatherFieldAnchorResult.self) { group in
@@ -219,7 +237,9 @@ final class NOAAClient {
 
         return ThreeByThreeWeatherFieldDebugData(
             center: center,
-            geometrySpacingMeters: Block1FieldGeometry.anchorSpacingMeters,
+            fieldWidthMiles: Double(normalizedFieldWidthMiles),
+            fieldHeightMiles: Double(normalizedFieldHeightMiles),
+            geometrySpacingMeters: anchorSpacingMeters,
             fieldAnchorDate: fieldAnchorDate,
             anchorResults: anchorResults
         )

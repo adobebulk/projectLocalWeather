@@ -30,6 +30,15 @@ struct WeatherDebugView: View {
             Section("Controls") {
                 Text("Developer NOAA Debug")
                 Text("Field center: \(requestCoordinateText)")
+                Picker("Field width (mi)", selection: Binding(
+                    get: { viewModel.selectedFieldWidthMiles },
+                    set: { viewModel.setFieldWidthMiles($0) }
+                )) {
+                    ForEach(WeatherDebugViewModel.fieldWidthOptionsMiles, id: \.self) { widthMiles in
+                        Text("\(widthMiles) mi").tag(widthMiles)
+                    }
+                }
+                .pickerStyle(.menu)
                 Button(viewModel.isLoading ? "Fetching..." : "Fetch NOAA 3x3 Field") {
                     Task {
                         await viewModel.fetchWeather(for: locationManager.currentFix)
@@ -136,10 +145,12 @@ struct WeatherDebugView: View {
                 Section("3x3 Field Summary") {
                     Text("Center latitude: \(String(format: "%.5f", fieldData.center.latitude))")
                     Text("Center longitude: \(String(format: "%.5f", fieldData.center.longitude))")
+                    Text("Field width (mi): \(Int(fieldData.fieldWidthMiles.rounded()))")
+                    Text("Field height (mi): \(Int(fieldData.fieldHeightMiles.rounded()))")
                     Text("Field anchor unix: \(Int(fieldData.fieldAnchorDate.timeIntervalSince1970))")
                     Text("Anchor ordering: r0c0 r0c1 r0c2 r1c0 r1c1 r1c2 r2c0 r2c1 r2c2")
                     Text("Anchor spacing meters: \(Int(fieldData.geometrySpacingMeters))")
-                    Text("Anchor spacing miles: \(Int(Block1FieldGeometry.anchorSpacingMiles))")
+                    Text("Anchor spacing miles: \(Int((fieldData.fieldWidthMiles / 2).rounded()))")
                     Text("Anchors fetched: \(fieldData.anchorResults.count)")
                 }
 

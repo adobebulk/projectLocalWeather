@@ -9,12 +9,10 @@ import CoreLocation
 import Foundation
 
 struct Block1FieldGeometry {
-    static let anchorSpacingMiles: Double = 120
-    static let anchorSpacingMeters: Double = anchorSpacingMiles * 1_609.344
-    static let fieldWidthMiles: Double = 240
-    static let fieldHeightMiles: Double = 240
-    static let fieldHalfWidthMeters: Double = (fieldWidthMiles * 1_609.344) / 2
-    static let fieldHalfHeightMeters: Double = (fieldHeightMiles * 1_609.344) / 2
+    static let defaultFieldWidthMiles: Int = 240
+    static let defaultFieldHeightMiles: Int = 240
+    static let gridRows: Int = 3
+    static let gridCols: Int = 3
 
     static let rowMajorOffsets: [(row: Int, column: Int, northMultiplier: Double, eastMultiplier: Double)] = [
         (0, 0, 1, -1),
@@ -28,13 +26,20 @@ struct Block1FieldGeometry {
         (2, 2, -1, 1)
     ]
 
-    static func makeAnchorCoordinates(center: WeatherFieldCenter) -> [WeatherFieldAnchorCoordinate] {
-        rowMajorOffsets.map { offset in
+    static func makeAnchorCoordinates(
+        center: WeatherFieldCenter,
+        fieldWidthMiles: Double,
+        fieldHeightMiles: Double
+    ) -> [WeatherFieldAnchorCoordinate] {
+        let eastWestSpacingMeters = (fieldWidthMiles * 1_609.344) / 2
+        let northSouthSpacingMeters = (fieldHeightMiles * 1_609.344) / 2
+
+        return rowMajorOffsets.map { offset in
             let coordinate = offsetCoordinate(
                 latitude: center.latitude,
                 longitude: center.longitude,
-                northMeters: offset.northMultiplier * anchorSpacingMeters,
-                eastMeters: offset.eastMultiplier * anchorSpacingMeters
+                northMeters: offset.northMultiplier * northSouthSpacingMeters,
+                eastMeters: offset.eastMultiplier * eastWestSpacingMeters
             )
 
             return WeatherFieldAnchorCoordinate(
@@ -46,8 +51,15 @@ struct Block1FieldGeometry {
         }
     }
 
-    static func fieldBoundaryCoordinates(center: WeatherFieldCenter) -> [CLLocationCoordinate2D] {
-        [
+    static func fieldBoundaryCoordinates(
+        center: WeatherFieldCenter,
+        fieldWidthMiles: Double,
+        fieldHeightMiles: Double
+    ) -> [CLLocationCoordinate2D] {
+        let fieldHalfWidthMeters = (fieldWidthMiles * 1_609.344) / 2
+        let fieldHalfHeightMeters = (fieldHeightMiles * 1_609.344) / 2
+
+        return [
             offsetCoordinate(
                 latitude: center.latitude,
                 longitude: center.longitude,
@@ -116,6 +128,8 @@ struct WeatherFieldAnchorResult: Identifiable {
 
 struct ThreeByThreeWeatherFieldDebugData {
     let center: WeatherFieldCenter
+    let fieldWidthMiles: Double
+    let fieldHeightMiles: Double
     let geometrySpacingMeters: Double
     let fieldAnchorDate: Date
     let anchorResults: [WeatherFieldAnchorResult]
