@@ -15,6 +15,10 @@ struct WeatherFieldMapView: View {
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedSlotOffsetMinutes = 0
     @State private var selectedAnchorNode: AnchorWeatherNode?
+    @State private var mapSize: CGSize = .zero
+    @State private var hasInitializedCamera = false
+    @State private var lastCameraSignature: CameraSignature?
+    @State private var renderedAnchorNodes: [AnchorWeatherNode] = []
 
     private let slotOffsets = [0, 60, 120]
 
@@ -33,27 +37,6 @@ struct WeatherFieldMapView: View {
         }
 
         return corners + [first]
-    }
-
-    private var anchorNodes: [AnchorWeatherNode] {
-        guard let fieldData else {
-            return []
-        }
-
-        return fieldData.anchorResults.map { anchorResult in
-            let slot = anchorResult.weatherData?.threeSlotModel.slots.first(where: { $0.offsetMinutes == selectedSlotOffsetMinutes })
-            let packetSlot = viewModel.latestRegionalSnapshotPacketDebug?
-                .anchors
-                .first(where: { $0.anchorLabel == anchorResult.anchor.label })?
-                .slots
-                .first(where: { $0.offsetMinutes == selectedSlotOffsetMinutes })
-            return AnchorWeatherNode(
-                anchorResult: anchorResult,
-                selectedSlotOffsetMinutes: selectedSlotOffsetMinutes,
-                slot: slot,
-                packetSlot: packetSlot
-            )
-        }
     }
 
     var body: some View {
@@ -82,7 +65,7 @@ struct WeatherFieldMapView: View {
                             .stroke(.teal.opacity(0.8), lineWidth: 2)
                     }
 
-                    ForEach(anchorNodes) { node in
+                    ForEach(renderedAnchorNodes) { node in
                         Annotation(node.anchorId, coordinate: node.coordinate) {
                             WeatherFieldAnchorAnnotationView(node: node)
                                 .onTapGesture {
@@ -97,10 +80,30 @@ struct WeatherFieldMapView: View {
                 }
                 .mapStyle(.standard)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(key: MapSizePreferenceKey.self, value: proxy.size)
+                    }
+                )
+                .onPreferenceChange(MapSizePreferenceKey.self) { newSize in
+                    guard newSize.width > 0, newSize.height > 0 else {
+                        return
+                    }
+
+                    if mapSize.width == 0 || mapSize.height == 0 {
+                        AppLogger.shared.log(
+                            category: "MAP",
+                            message: "map size became non-zero width=\(Int(newSize.width.rounded())) height=\(Int(newSize.height.rounded()))"
+                        )
+                    }
+
+                    mapSize = newSize
+                    updateCameraPosition(reason: "map-size-change")
+                }
 
                 List {
                     Section("Anchor Summary") {
-                        ForEach(anchorNodes) { node in
+                        ForEach(renderedAnchorNodes) { node in
                             Text(
                                 """
                                 \(node.anchorId) \
@@ -127,22 +130,56 @@ struct WeatherFieldMapView: View {
         .onAppear {
             let hasField = fieldData != nil
             AppLogger.shared.log(category: "MAP", message: "weather field map appeared hasField=\(hasField) slot=\(selectedSlotOffsetMinutes)")
-            updateCameraPosition()
+            rebuildAnchorNodes(reason: "appear")
+            updateCameraPosition(reason: "appear")
         }
         .onChange(of: selectedSlotOffsetMinutes) { _, newOffset in
             AppLogger.shared.log(category: "MAP", message: "map slot changed slotOffset=\(newOffset)")
+            rebuildAnchorNodes(reason: "slot-change")
         }
         .onChange(of: viewModel.latestPacketRevision) { _, newRevision in
             AppLogger.shared.log(category: "MAP", message: "map weather field changed packetRevision=\(newRevision) hasField=\(fieldData != nil)")
-            updateCameraPosition()
+            rebuildAnchorNodes(reason: "field-revision")
+            updateCameraPosition(reason: "field-revision")
         }
         .sheet(item: $selectedAnchorNode) { node in
             AnchorDetailView(anchor: node)
         }
     }
 
-    private func updateCameraPosition() {
+    private func rebuildAnchorNodes(reason: String) {
         guard let fieldData else {
+            renderedAnchorNodes = []
+            AppLogger.shared.log(category: "MAP", message: "annotation model rebuilt reason=\(reason) count=0")
+            return
+        }
+
+        renderedAnchorNodes = fieldData.anchorResults.map { anchorResult in
+            let slot = anchorResult.weatherData?.threeSlotModel.slots.first(where: { $0.offsetMinutes == selectedSlotOffsetMinutes })
+            let packetSlot = viewModel.latestRegionalSnapshotPacketDebug?
+                .anchors
+                .first(where: { $0.anchorLabel == anchorResult.anchor.label })?
+                .slots
+                .first(where: { $0.offsetMinutes == selectedSlotOffsetMinutes })
+            return AnchorWeatherNode(
+                anchorResult: anchorResult,
+                selectedSlotOffsetMinutes: selectedSlotOffsetMinutes,
+                slot: slot,
+                packetSlot: packetSlot
+            )
+        }
+
+        AppLogger.shared.log(category: "MAP", message: "annotation model rebuilt reason=\(reason) count=\(renderedAnchorNodes.count)")
+    }
+
+    private func updateCameraPosition(reason: String) {
+        guard let fieldData else {
+            AppLogger.shared.log(category: "MAP", message: "camera update skipped reason=\(reason) missing-field")
+            return
+        }
+
+        guard mapSize.width > 0, mapSize.height > 0 else {
+            AppLogger.shared.log(category: "MAP", message: "camera update skipped reason=\(reason) map-size-zero")
             return
         }
 
@@ -164,6 +201,18 @@ struct WeatherFieldMapView: View {
 
         let latitudeSpan = max((maxLatitude - minLatitude) * 1.25, 0.5)
         let longitudeSpan = max((maxLongitude - minLongitude) * 1.25, 0.5)
+        let signature = CameraSignature(
+            centerLatitudeE5: Int((fieldData.center.latitude * 100_000).rounded()),
+            centerLongitudeE5: Int((fieldData.center.longitude * 100_000).rounded()),
+            latitudeSpanE4: Int((latitudeSpan * 10_000).rounded()),
+            longitudeSpanE4: Int((longitudeSpan * 10_000).rounded())
+        )
+
+        if let lastCameraSignature, lastCameraSignature == signature {
+            AppLogger.shared.log(category: "MAP", message: "camera update skipped because unchanged reason=\(reason)")
+            return
+        }
+
         let region = MKCoordinateRegion(
             center: CLLocationCoordinate2D(
                 latitude: fieldData.center.latitude,
@@ -173,10 +222,33 @@ struct WeatherFieldMapView: View {
         )
 
         cameraPosition = .region(region)
+        lastCameraSignature = signature
+        if !hasInitializedCamera {
+            hasInitializedCamera = true
+            AppLogger.shared.log(
+                category: "MAP",
+                message: "initial camera applied centerLat=\(fieldData.center.latitude) centerLon=\(fieldData.center.longitude)"
+            )
+        }
         AppLogger.shared.log(
             category: "MAP",
-            message: "map camera updated centerLat=\(fieldData.center.latitude) centerLon=\(fieldData.center.longitude) latDelta=\(latitudeSpan) lonDelta=\(longitudeSpan)"
+            message: "map camera updated reason=\(reason) centerLat=\(fieldData.center.latitude) centerLon=\(fieldData.center.longitude) latDelta=\(latitudeSpan) lonDelta=\(longitudeSpan)"
         )
+    }
+}
+
+private struct CameraSignature: Equatable {
+    let centerLatitudeE5: Int
+    let centerLongitudeE5: Int
+    let latitudeSpanE4: Int
+    let longitudeSpanE4: Int
+}
+
+private struct MapSizePreferenceKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
     }
 }
 
