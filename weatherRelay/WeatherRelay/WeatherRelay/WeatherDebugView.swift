@@ -112,6 +112,19 @@ struct WeatherDebugView: View {
                 }
             }
 
+            Section("Display") {
+                Text("Developer Display Control")
+                Button("Turn Display ON") {
+                    bleManager.sendDisplayOn()
+                }
+                .disabled(!bleManager.didDiscoverCharacteristics)
+
+                Button("Turn Display OFF") {
+                    bleManager.sendDisplayOff()
+                }
+                .disabled(!bleManager.didDiscoverCharacteristics)
+            }
+
             Section("Request") {
                 Text("Coordinate: \(requestCoordinateText)")
                 Text("Location status: \(locationManager.statusText)")

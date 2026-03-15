@@ -11,6 +11,7 @@ constexpr uint8_t kSupportedVersion = 1;
 constexpr uint8_t kPacketTypeRegionalSnapshotV1 = 1;
 constexpr uint8_t kPacketTypePositionUpdateV1 = 2;
 constexpr uint8_t kPacketTypeAckV1 = 3;
+constexpr uint8_t kPacketTypeDisplayControlV1 = 4;
 
 constexpr size_t kMagicOffset = 0;
 constexpr size_t kVersionOffset = 2;
@@ -25,6 +26,7 @@ constexpr size_t kHeaderSize = 18;
 
 constexpr size_t kPositionPacketSize = 32;
 constexpr size_t kAckPacketSize = 32;
+constexpr size_t kDisplayControlPacketSize = 32;
 constexpr size_t kRegionalSnapshotPacketSize = 470;
 constexpr size_t kMaxPacketLength = 512;
 constexpr size_t kAssemblerBufferSize = 768;
@@ -52,6 +54,10 @@ size_t expectedLengthForPacketType(uint8_t packet_type) {
 
   if (packet_type == kPacketTypeAckV1) {
     return kAckPacketSize;
+  }
+
+  if (packet_type == kPacketTypeDisplayControlV1) {
+    return kDisplayControlPacketSize;
   }
 
   return 0;

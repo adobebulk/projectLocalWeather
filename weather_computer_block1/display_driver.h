@@ -15,6 +15,8 @@ bool scanI2cBus(Stream& serial);
 void beginLcd();
 bool writeLines(const char* line1, const char* line2);
 bool isReady();
+void setBacklightEnabled(bool enabled);
+bool isBacklightEnabled();
 
 }  // namespace display_driver
 

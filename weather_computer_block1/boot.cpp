@@ -43,6 +43,8 @@ void boot() {
   }
 
   display_driver::beginLcd();
+  display_driver::setBacklightEnabled(false);
+  Serial.println("DISPLAY: backlight off");
   Serial.println("LCD: init success");
 
   Serial.println("DISPLAY: write start");

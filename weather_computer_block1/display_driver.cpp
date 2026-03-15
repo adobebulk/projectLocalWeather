@@ -18,6 +18,7 @@ constexpr uint8_t kQwiicSclPin = 12;
 
 SerLCD lcd;
 bool g_ready = false;
+bool g_backlight_enabled = false;
 
 void writeLine(uint8_t row, const char* text) {
   lcd.setCursor(0, row);
@@ -105,12 +106,13 @@ bool scanI2cBus(Stream& serial) {
 
 void beginLcd() {
   g_ready = false;
+  g_backlight_enabled = false;
   delay(50);
 
   // SerLCD library 1.0.9 exposes begin() as void, so device presence is checked
   // with the I2C scanner before calling this.
   lcd.begin(Wire, kDisplayI2cAddress);
-  lcd.setBacklight(0, 64, 96);
+  lcd.setBacklight(0, 0, 0);
   lcd.clear();
   lcd.setContrast(5);
   lcd.setCursor(0, 0);
@@ -129,6 +131,24 @@ bool writeLines(const char* line1, const char* line2) {
 
 bool isReady() {
   return g_ready;
+}
+
+void setBacklightEnabled(bool enabled) {
+  if (!g_ready) {
+    g_backlight_enabled = enabled;
+    return;
+  }
+
+  if (enabled) {
+    lcd.setBacklight(0, 64, 96);
+  } else {
+    lcd.setBacklight(0, 0, 0);
+  }
+  g_backlight_enabled = enabled;
+}
+
+bool isBacklightEnabled() {
+  return g_backlight_enabled;
 }
 
 }  // namespace display_driver

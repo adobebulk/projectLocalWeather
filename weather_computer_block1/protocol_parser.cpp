@@ -72,6 +72,9 @@ size_t expectedPacketSize(uint8_t packet_type) {
   if (packet_type == protocol_parser::kPacketTypeAckV1) {
     return protocol_parser::kAckPacketSize;
   }
+  if (packet_type == protocol_parser::kPacketTypeDisplayControlV1) {
+    return protocol_parser::kAckPacketSize;
+  }
   return 0;
 }
 
@@ -100,6 +103,13 @@ void parseAck(protocol_parser::AckV1* ack, const uint8_t* packet) {
   ack->active_weather_timestamp_unix = readU32(packet, kAckPayloadOffset + 5);
   ack->active_position_timestamp_unix = readU32(packet, kAckPayloadOffset + 9);
   ack->reserved = packet[kAckPayloadOffset + 13];
+}
+
+void parseDisplayControl(protocol_parser::DisplayControlV1* display_control, const uint8_t* packet) {
+  display_control->command = packet[kAckPayloadOffset + 0];
+  for (size_t i = 0; i < sizeof(display_control->reserved); ++i) {
+    display_control->reserved[i] = packet[kAckPayloadOffset + 1 + i];
+  }
 }
 
 void parseRegionalSnapshot(protocol_parser::RegionalSnapshotV1* snapshot, const uint8_t* packet) {
@@ -189,6 +199,13 @@ ParseResult parsePacket(const uint8_t* packet, size_t length) {
     return result;
   }
 
+  if (result.header.packet_type == kPacketTypeDisplayControlV1) {
+    result.display_control.header = result.header;
+    parseDisplayControl(&result.display_control, packet);
+    result.status = kParseOk;
+    return result;
+  }
+
   result.regional_snapshot.header = result.header;
   parseRegionalSnapshot(&result.regional_snapshot, packet);
   result.status = kParseOk;
@@ -205,6 +222,9 @@ const char* statusToLogMessage(ParseStatus status, uint8_t packet_type) {
     }
     if (packet_type == kPacketTypeRegionalSnapshotV1) {
       return "PARSER: weather packet valid";
+    }
+    if (packet_type == kPacketTypeDisplayControlV1) {
+      return "PARSER: display control packet valid";
     }
     return "PARSER: unknown packet type";
   }

@@ -11,6 +11,7 @@ enum PacketType: UInt8 {
     case weatherSnapshot = 1
     case positionUpdate = 2
     case ack = 3
+    case displayControl = 4
 }
 
 enum AckStatus: UInt8, CustomStringConvertible {

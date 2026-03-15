@@ -24,6 +24,11 @@ enum PacketBuilder {
         let fixTimestampUnix: UInt32
     }
 
+    enum DisplayControlCommand: UInt8 {
+        case off = 0
+        case on = 1
+    }
+
     static func makePositionUpdateV1(values: PositionValues) -> Data {
         var packet = Data()
         packet.reserveCapacity(positionPacketSize)
@@ -68,6 +73,14 @@ enum PacketBuilder {
         }
 
         return updated
+    }
+
+    static func makeDisplayControlV1(command: DisplayControlCommand) -> Data {
+        var packet = Data()
+        packet.reserveCapacity(2)
+        packet.append(PacketType.displayControl.rawValue)
+        packet.append(command.rawValue)
+        return packet
     }
 }
 

@@ -126,6 +126,17 @@ void handlePacket(const protocol_parser::ParseResult& result, Stream& serial) {
     serial.println("INGRESS: ack ignored");
     return;
   }
+
+  if (result.header.packet_type == protocol_parser::kPacketTypeDisplayControlV1) {
+    if (result.display_control.command == 1) {
+      display_driver::setBacklightEnabled(true);
+      serial.println("DISPLAY: backlight on");
+    } else {
+      display_driver::setBacklightEnabled(false);
+      serial.println("DISPLAY: backlight off");
+    }
+    return;
+  }
 }
 
 void recomputeFromState(Stream& serial) {

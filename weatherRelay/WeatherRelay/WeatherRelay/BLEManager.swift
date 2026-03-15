@@ -190,6 +190,14 @@ final class BLEManager: NSObject, ObservableObject {
         sendPositionPacket(locationFix: locationFix, trigger: "manual")
     }
 
+    func sendDisplayOn() {
+        sendDisplayControl(command: .on)
+    }
+
+    func sendDisplayOff() {
+        sendDisplayControl(command: .off)
+    }
+
     func sendLatestRegionalSnapshotV1Debug() {
         guard hasNewerWeatherToSend || latestWeatherField != nil else {
             print("BLEManager: manual RegionalSnapshotV1 send skipped - no weather field available")
@@ -394,6 +402,22 @@ final class BLEManager: NSObject, ObservableObject {
             """
         )
         writeToRX(packet, label: "PositionUpdateV1 packet")
+    }
+
+    private func sendDisplayControl(command: PacketBuilder.DisplayControlCommand) {
+        let commandLabel = command == .on ? "display_on" : "display_off"
+        let packet = PacketBuilder.makeDisplayControlV1(command: command)
+        lastSentPacketHex = packet.hexString
+
+        print(
+            """
+            BLEManager: sending DisplayControlV1 \
+            command=\(commandLabel) \
+            hex=\(packet.hexString)
+            """
+        )
+        AppLogger.shared.log(category: "BLE", message: "DISPLAY_CMD: sending \(commandLabel)")
+        writeToRX(packet, label: "DisplayControlV1 \(commandLabel)")
     }
 
     private func writeToRX(_ payload: Data, label: String) {

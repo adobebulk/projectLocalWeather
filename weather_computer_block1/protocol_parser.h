@@ -10,6 +10,7 @@ constexpr uint8_t kVersion = 1;
 constexpr uint8_t kPacketTypeRegionalSnapshotV1 = 1;
 constexpr uint8_t kPacketTypePositionUpdateV1 = 2;
 constexpr uint8_t kPacketTypeAckV1 = 3;
+constexpr uint8_t kPacketTypeDisplayControlV1 = 4;
 
 constexpr size_t kHeaderSize = 18;
 constexpr size_t kRegionalSnapshotPacketSize = 470;
@@ -54,6 +55,12 @@ struct __attribute__((packed)) AckV1 {
   uint8_t reserved;
 };
 
+struct __attribute__((packed)) DisplayControlV1 {
+  PacketHeader header;
+  uint8_t command;
+  uint8_t reserved[13];
+};
+
 struct __attribute__((packed)) RegionalSnapshotMetadataV1 {
   int32_t field_center_lat_e5;
   int32_t field_center_lon_e5;
@@ -91,6 +98,7 @@ struct ParseResult {
   PacketHeader header;
   PositionUpdateV1 position;
   AckV1 ack;
+  DisplayControlV1 display_control;
   RegionalSnapshotV1 regional_snapshot;
 };
 
@@ -101,6 +109,8 @@ static_assert(sizeof(PacketHeader) == kHeaderSize, "PacketHeader size must match
 static_assert(sizeof(PositionUpdateV1) == kPositionUpdatePacketSize,
               "PositionUpdateV1 size must match protocol");
 static_assert(sizeof(AckV1) == kAckPacketSize, "AckV1 size must match protocol");
+static_assert(sizeof(DisplayControlV1) == kAckPacketSize,
+              "DisplayControlV1 size must match protocol");
 static_assert(sizeof(RegionalSnapshotMetadataV1) == 20,
               "RegionalSnapshotMetadataV1 size must match protocol");
 static_assert(sizeof(WeatherSlot) == 16, "WeatherSlot size must match protocol");

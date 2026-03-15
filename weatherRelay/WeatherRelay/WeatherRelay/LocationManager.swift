@@ -60,6 +60,8 @@ final class LocationManager: NSObject, ObservableObject {
         super.init()
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.allowsBackgroundLocationUpdates = true
+        locationManager.pausesLocationUpdatesAutomatically = false
         locationManager.requestWhenInUseAuthorization()
         print("LocationManager: initialized")
     }
@@ -77,12 +79,14 @@ final class LocationManager: NSObject, ObservableObject {
     private func startUpdatesIfAuthorized() {
         switch authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
-            locationManager.allowsBackgroundLocationUpdates = authorizationStatus == .authorizedAlways
+            locationManager.allowsBackgroundLocationUpdates = true
+            locationManager.pausesLocationUpdatesAutomatically = false
             print(
                 """
                 LocationManager: starting location updates \
                 authorization=\(authorizationStatus.description) \
-                allowsBackground=\(locationManager.allowsBackgroundLocationUpdates)
+                allowsBackground=\(locationManager.allowsBackgroundLocationUpdates) \
+                pausesAutomatically=\(locationManager.pausesLocationUpdatesAutomatically)
                 """
             )
             locationManager.startUpdatingLocation()
@@ -103,7 +107,8 @@ extension LocationManager: CLLocationManagerDelegate {
             """
             LocationManager: authorization changed \
             status=\(authorizationStatus.description) \
-            allowsBackground=\(manager.allowsBackgroundLocationUpdates)
+            allowsBackground=\(manager.allowsBackgroundLocationUpdates) \
+            pausesAutomatically=\(manager.pausesLocationUpdatesAutomatically)
             """
         )
         startUpdatesIfAuthorized()

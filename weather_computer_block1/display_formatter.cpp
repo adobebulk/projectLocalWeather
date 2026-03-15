@@ -1,12 +1,15 @@
 #include "display_formatter.h"
 
 #include <Arduino.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 namespace {
 
 constexpr uint32_t kStaleThresholdMinutes = 300;
+constexpr double kMetersPerStatuteMile = 1609.344;
+constexpr double kMetersPerSecondToMph = 2.2369362920544;
 
 void fitToDisplay(const char* source, char* destination) {
   size_t index = 0;
@@ -23,8 +26,9 @@ void fitToDisplay(const char* source, char* destination) {
   destination[16] = '\0';
 }
 
-int roundedUnsignedTenthsToWhole(uint16_t value_tenths) {
-  return (static_cast<int>(value_tenths) + 5) / 10;
+int roundedMpsTenthsToMph(uint16_t value_tenths) {
+  const double mps = static_cast<double>(value_tenths) / 10.0;
+  return static_cast<int>(round(mps * kMetersPerSecondToMph));
 }
 
 bool hasHazard(uint16_t hazard_flags, uint8_t bit_index) {
@@ -35,83 +39,51 @@ bool visibilityMissing(uint16_t visibility_m) {
   return visibility_m == 0;
 }
 
-const char* visibilityCode(uint16_t visibility_m) {
+void visibilityCode(uint16_t visibility_m, char* out_code) {
   if (visibilityMissing(visibility_m)) {
-    return "";
+    out_code[0] = '\0';
+    return;
   }
-  if (visibility_m < 1000) {
-    return "VL";
-  }
-  if (visibility_m < 3000) {
-    return "V2";
-  }
-  if (visibility_m < 8000) {
-    return "V5";
-  }
-  return "V10";
-}
 
-char intensityMarker(uint8_t precip_intensity) {
-  if (precip_intensity == 1) {
-    return '-';
+  const double visibility_miles = static_cast<double>(visibility_m) / kMetersPerStatuteMile;
+  if (visibility_miles < 0.5) {
+    snprintf(out_code, 4, "VL");
+    return;
   }
-  if (precip_intensity >= 3 && precip_intensity != 255) {
-    return '+';
+
+  if (visibility_miles > 10.0) {
+    snprintf(out_code, 4, "V+");
+    return;
   }
-  return '\0';
+
+  int rounded_miles = static_cast<int>(round(visibility_miles));
+  if (rounded_miles < 1) {
+    rounded_miles = 1;
+  } else if (rounded_miles > 10) {
+    rounded_miles = 10;
+  }
+  snprintf(out_code, 4, "V%d", rounded_miles);
 }
 
 bool phenomenonCode(const interpolation::LocalEstimate& estimate, char* out_code) {
-  // Hazard mapping is intentionally conservative: any thunder-related flag
-  // takes precedence over precip-kind-derived phenomena on Line 1.
-  const bool thunder = hasHazard(estimate.hazard_flags, 0) || hasHazard(estimate.hazard_flags, 1);
-  const bool icing = estimate.precip_kind == 4 || hasHazard(estimate.hazard_flags, 5);
-  const bool snow = estimate.precip_kind == 2;
-  const bool rain = estimate.precip_kind == 1;
-  const bool visibility_known = !visibilityMissing(estimate.visibility_m);
-  const bool fog = visibility_known && estimate.visibility_m < 1000;
-  const bool smoke =
-      visibility_known && estimate.visibility_m >= 1000 && estimate.visibility_m < 3000;
-  const bool haze =
-      visibility_known && estimate.visibility_m >= 3000 && estimate.visibility_m < 8000;
-  const bool mixed = estimate.precip_kind == 3 || estimate.precip_kind == 5 ||
-                     estimate.precip_kind == 6 || estimate.precip_kind == 255;
-
-  const char* base_code = "";
-  if (thunder) {
-    base_code = "TS";
-  } else if (icing) {
-    base_code = "IC";
-  } else if (snow) {
-    base_code = "SN";
-  } else if (rain) {
-    base_code = "RA";
-  } else if (fog) {
-    base_code = "FG";
-  } else if (smoke) {
-    base_code = "SM";
-  } else if (haze) {
-    base_code = "HZ";
-  } else if (mixed) {
-    base_code = "MX";
-  } else {
+  // Block 1.1 hazard display policy: only show hazard codes that are explicitly
+  // present in forecast-office hazard flags; no derived hazards.
+  if (estimate.hazard_flags == 0) {
     out_code[0] = '\0';
     return false;
   }
 
-  const char marker = intensityMarker(estimate.precip_intensity);
-  if (marker != '\0' && (strcmp(base_code, "RA") == 0 || strcmp(base_code, "SN") == 0 ||
-                         strcmp(base_code, "IC") == 0 || strcmp(base_code, "MX") == 0)) {
-    out_code[0] = marker;
-    out_code[1] = base_code[0];
-    out_code[2] = base_code[1];
-    out_code[3] = '\0';
+  if (hasHazard(estimate.hazard_flags, 1)) {
+    snprintf(out_code, 4, "SV");
+  } else if (hasHazard(estimate.hazard_flags, 0)) {
+    snprintf(out_code, 4, "TS");
+  } else if (hasHazard(estimate.hazard_flags, 5)) {
+    snprintf(out_code, 4, "IC");
+  } else if (hasHazard(estimate.hazard_flags, 3)) {
+    snprintf(out_code, 4, "WI");
   } else {
-    out_code[0] = base_code[0];
-    out_code[1] = base_code[1];
-    out_code[2] = '\0';
+    snprintf(out_code, 4, "HZ");
   }
-
   return true;
 }
 
@@ -121,8 +93,8 @@ bool shouldDropVisibilityForPhenomenon(const char* phenomenon) {
 }
 
 void buildWindBlock(const interpolation::LocalEstimate& estimate, bool include_gust, char* out_block) {
-  const int wind = roundedUnsignedTenthsToWhole(estimate.wind_speed_mps_tenths);
-  const int gust = roundedUnsignedTenthsToWhole(estimate.wind_gust_mps_tenths);
+  const int wind = roundedMpsTenthsToMph(estimate.wind_speed_mps_tenths);
+  const int gust = roundedMpsTenthsToMph(estimate.wind_gust_mps_tenths);
 
   if (include_gust && gust > wind) {
     snprintf(out_block, 16, "W%dG%d", wind, gust);
@@ -140,7 +112,7 @@ void buildLine1(const interpolation::LocalEstimate& estimate, char* out_line) {
   bool include_phenomenon = phenomenonCode(estimate, phenomenon);
   bool include_gust = true;
 
-  snprintf(visibility, sizeof(visibility), "%s", visibilityCode(estimate.visibility_m));
+  visibilityCode(estimate.visibility_m, visibility);
   buildWindBlock(estimate, include_gust, wind);
 
   char candidate[24];
@@ -174,7 +146,7 @@ void buildLine1(const interpolation::LocalEstimate& estimate, char* out_line) {
       continue;
     }
 
-    if (include_visibility && (strcmp(visibility, "V10") == 0 || strcmp(visibility, "V5") == 0)) {
+    if (include_visibility && (strcmp(visibility, "V10") == 0 || strcmp(visibility, "V+") == 0)) {
       include_visibility = false;
       continue;
     }
@@ -277,13 +249,21 @@ DisplayLines formatEstimate(const interpolation::LocalEstimate& estimate,
 void logDecision(const interpolation::LocalEstimate& estimate, const DisplayContext& context,
                  Stream& serial) {
   const bool vis_missing = visibilityMissing(estimate.visibility_m);
+  char visibility[4];
+  visibilityCode(estimate.visibility_m, visibility);
   serial.print("DISPLAY: decision visibility_m=");
   serial.print(estimate.visibility_m);
+  serial.print(" visibility_mi=");
+  if (vis_missing) {
+    serial.print("NA");
+  } else {
+    serial.print(static_cast<double>(estimate.visibility_m) / kMetersPerStatuteMile, 2);
+  }
   serial.print(" visibility_code=");
   if (vis_missing) {
     serial.print("UNK");
   } else {
-    serial.print(visibilityCode(estimate.visibility_m));
+    serial.print(visibility);
   }
   serial.print(" source=");
   serial.println(vis_missing ? "missing" : "reported");
