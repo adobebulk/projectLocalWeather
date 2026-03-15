@@ -77,10 +77,12 @@ size_t anchorIndex(size_t row, size_t column) {
 
 bool validateWeatherField(const protocol_parser::RegionalSnapshotV1& weather) {
   const protocol_parser::RegionalSnapshotMetadataV1& metadata = weather.metadata;
-  if (metadata.field_width_mi != interpolation::kFieldWidthMiles) {
+  if (metadata.field_width_mi < interpolation::kMinFieldDimensionMiles ||
+      metadata.field_width_mi > interpolation::kMaxFieldDimensionMiles) {
     return false;
   }
-  if (metadata.field_height_mi != interpolation::kFieldHeightMiles) {
+  if (metadata.field_height_mi < interpolation::kMinFieldDimensionMiles ||
+      metadata.field_height_mi > interpolation::kMaxFieldDimensionMiles) {
     return false;
   }
   if (metadata.grid_rows != interpolation::kGridRows ||
@@ -108,17 +110,31 @@ bool validateWeatherField(const protocol_parser::RegionalSnapshotV1& weather) {
 void logWeatherFieldFailure(const protocol_parser::RegionalSnapshotV1& weather, Stream& serial) {
   const protocol_parser::RegionalSnapshotMetadataV1& metadata = weather.metadata;
 
-  if (metadata.field_width_mi != interpolation::kFieldWidthMiles) {
-    serial.print("ESTIMATE: weather field invalid reason=field_width expected=");
-    serial.print(interpolation::kFieldWidthMiles);
+  if (metadata.field_width_mi < interpolation::kMinFieldDimensionMiles) {
+    serial.print("ESTIMATE: weather field invalid reason=field_width too_small min=");
+    serial.print(interpolation::kMinFieldDimensionMiles);
+    serial.print(" actual=");
+    serial.println(metadata.field_width_mi);
+    return;
+  }
+  if (metadata.field_width_mi > interpolation::kMaxFieldDimensionMiles) {
+    serial.print("ESTIMATE: weather field invalid reason=field_width too_large max=");
+    serial.print(interpolation::kMaxFieldDimensionMiles);
     serial.print(" actual=");
     serial.println(metadata.field_width_mi);
     return;
   }
 
-  if (metadata.field_height_mi != interpolation::kFieldHeightMiles) {
-    serial.print("ESTIMATE: weather field invalid reason=field_height expected=");
-    serial.print(interpolation::kFieldHeightMiles);
+  if (metadata.field_height_mi < interpolation::kMinFieldDimensionMiles) {
+    serial.print("ESTIMATE: weather field invalid reason=field_height too_small min=");
+    serial.print(interpolation::kMinFieldDimensionMiles);
+    serial.print(" actual=");
+    serial.println(metadata.field_height_mi);
+    return;
+  }
+  if (metadata.field_height_mi > interpolation::kMaxFieldDimensionMiles) {
+    serial.print("ESTIMATE: weather field invalid reason=field_height too_large max=");
+    serial.print(interpolation::kMaxFieldDimensionMiles);
     serial.print(" actual=");
     serial.println(metadata.field_height_mi);
     return;

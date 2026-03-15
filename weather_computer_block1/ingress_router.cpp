@@ -61,6 +61,15 @@ void recomputeEstimate(device_state::DeviceState* state, Stream& serial) {
   const uint32_t recompute_timestamp =
       state->weather_timestamp > state->position_timestamp ? state->weather_timestamp
                                                            : state->position_timestamp;
+  const protocol_parser::RegionalSnapshotMetadataV1& metadata = state->weather.metadata;
+  serial.print("ESTIMATE: weather field geometry width_mi=");
+  serial.print(metadata.field_width_mi);
+  serial.print(" height_mi=");
+  serial.print(metadata.field_height_mi);
+  serial.print(" rows=");
+  serial.print(metadata.grid_rows);
+  serial.print(" cols=");
+  serial.println(metadata.grid_cols);
 
   serial.println("ESTIMATE: recompute start");
   interpolation::LocalEstimate estimate = {};
@@ -82,6 +91,10 @@ void recomputeEstimate(device_state::DeviceState* state, Stream& serial) {
   state->estimate = estimate;
   state->has_estimate = true;
   state->estimate_timestamp = recompute_timestamp;
+  serial.print("ESTIMATE: validation passed dynamic geometry width_mi=");
+  serial.print(metadata.field_width_mi);
+  serial.print(" height_mi=");
+  serial.println(metadata.field_height_mi);
   serial.println("ESTIMATE: success");
   logEstimate(state->estimate, serial);
   updateRuntimeDisplay(state->estimate, serial);

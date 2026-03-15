@@ -9,6 +9,8 @@ namespace interpolation {
 
 constexpr uint16_t kFieldWidthMiles = 240;
 constexpr uint16_t kFieldHeightMiles = 240;
+constexpr uint16_t kMinFieldDimensionMiles = 1;
+constexpr uint16_t kMaxFieldDimensionMiles = 1000;
 constexpr uint8_t kGridRows = 3;
 constexpr uint8_t kGridCols = 3;
 constexpr uint8_t kSlotCount = 3;
