@@ -406,12 +406,22 @@ final class BLEManager: NSObject, ObservableObject {
 
     private func sendDisplayControl(command: PacketBuilder.DisplayControlCommand) {
         let commandLabel = command == .on ? "display_on" : "display_off"
-        let packet = PacketBuilder.makeDisplayControlV1(command: command)
+        let sequence = nextSequenceNumber
+        nextSequenceNumber += 1
+        let timestampUnix = UInt32(max(0, Date().timeIntervalSince1970.rounded()))
+        let values = PacketBuilder.DisplayControlValues(
+            sequence: sequence,
+            timestampUnix: timestampUnix,
+            command: command
+        )
+        let packet = PacketBuilder.makeDisplayControlV1(values: values)
         lastSentPacketHex = packet.hexString
 
         print(
             """
             BLEManager: sending DisplayControlV1 \
+            sequence=\(sequence) \
+            timestampUnix=\(timestampUnix) \
             command=\(commandLabel) \
             hex=\(packet.hexString)
             """

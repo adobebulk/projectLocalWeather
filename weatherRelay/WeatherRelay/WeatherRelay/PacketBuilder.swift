@@ -29,6 +29,12 @@ enum PacketBuilder {
         case on = 1
     }
 
+    struct DisplayControlValues {
+        let sequence: UInt32
+        let timestampUnix: UInt32
+        let command: DisplayControlCommand
+    }
+
     static func makePositionUpdateV1(values: PositionValues) -> Data {
         var packet = Data()
         packet.reserveCapacity(positionPacketSize)
@@ -75,11 +81,25 @@ enum PacketBuilder {
         return updated
     }
 
-    static func makeDisplayControlV1(command: DisplayControlCommand) -> Data {
+    static func makeDisplayControlV1(values: DisplayControlValues) -> Data {
         var packet = Data()
-        packet.reserveCapacity(2)
+        packet.reserveCapacity(positionPacketSize)
+
+        packet.appendLittleEndian(magic)
+        packet.append(version)
         packet.append(PacketType.displayControl.rawValue)
-        packet.append(command.rawValue)
+        packet.appendLittleEndian(UInt16(positionPacketSize))
+        packet.appendLittleEndian(values.sequence)
+        packet.appendLittleEndian(values.timestampUnix)
+        packet.appendLittleEndian(UInt32(0))
+
+        packet.append(values.command.rawValue)
+        for _ in 0..<13 {
+            packet.append(0)
+        }
+
+        let crc = crc32(packet)
+        packet.replaceSubrange(crcOffset..<(crcOffset + 4), with: crc.littleEndianBytes)
         return packet
     }
 }
